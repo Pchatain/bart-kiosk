@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.bart.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
+  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.bart.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Fruitvale BART Departures</title>
 <style>
   :root {
@@ -241,6 +241,33 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, REFRESH_MS);
+
+// Reload the page when a new version of it is published.
+// Every few minutes, fetch this page's own file and compare it to the version
+// that was current when the page loaded. Failed checks (network down, server
+// error) are ignored, so the kiosk never reloads into an error page.
+const UPDATE_CHECK_MS = 5 * 60 * 1000;
+let loadedVersion = null;
+
+async function checkForUpdate() {
+  try {
+    const url = location.href.split("#")[0];
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return;
+    const text = await res.text();
+    if (!text.includes("<title>Fruitvale BART Departures</title>")) return;
+    if (loadedVersion === null) {
+      loadedVersion = text;
+    } else if (text !== loadedVersion) {
+      location.reload();
+    }
+  } catch (err) {
+    console.log("Update check failed:", err.message);
+  }
+}
+
+checkForUpdate();
+setInterval(checkForUpdate, UPDATE_CHECK_MS);
 </script>
 </body>
 </html>
