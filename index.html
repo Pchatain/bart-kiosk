@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fruitvale BART Departures</title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #141e33;
+    --text: #f2f6ff;
+    --muted: #8da2c0;
+    --accent: #4da3ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 2vh 3vw 1vh;
+  }
+  header h1 {
+    font-size: 5vh;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+  header h1 span { color: var(--accent); }
+  #clock {
+    font-size: 4.5vh;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2vh;
+    padding: 0 2vw 1vh;
+    min-height: 0;
+  }
+  .platform {
+    background: var(--panel);
+    border-radius: 1.5vh;
+    padding: 1.5vh 1.5vw;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .platform h2 {
+    font-size: 3.6vh;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid rgba(255,255,255,0.12);
+    padding-bottom: 1vh;
+    margin-bottom: 1vh;
+  }
+  .platform h2 small {
+    display: block;
+    font-size: 2vh;
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 0.3vh;
+  }
+  .trains { flex: 1; overflow: hidden; }
+  .train {
+    display: flex;
+    align-items: center;
+    gap: 1vw;
+    padding: 1.4vh 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .train:last-child { border-bottom: none; }
+  .line-dot {
+    width: 2.4vh;
+    height: 2.4vh;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.35);
+  }
+  .dest {
+    flex: 1;
+    font-size: 3.4vh;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mins {
+    font-size: 3.4vh;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .mins .unit {
+    font-size: 2vh;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 0.4vw;
+  }
+  .mins.leaving { color: #ffd34d; }
+  .empty, .error {
+    font-size: 2.8vh;
+    color: var(--muted);
+    padding: 3vh 0;
+    text-align: center;
+  }
+  .error { color: #ff8a80; }
+  footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8vh 3vw 1.2vh;
+    font-size: 1.8vh;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Fruitvale <span>BART</span></h1>
+    <div id="clock">--:--</div>
+  </header>
+  <main>
+    <section class="platform">
+      <h2>Platform 1 <small>Toward Berryessa &amp; Dublin</small></h2>
+      <div class="trains" id="platform1"><div class="empty">Loading&hellip;</div></div>
+    </section>
+    <section class="platform">
+      <h2>Platform 2 <small>Toward Oakland &amp; San Francisco</small></h2>
+      <div class="trains" id="platform2"><div class="empty">Loading&hellip;</div></div>
+    </section>
+  </main>
+  <footer>
+    <div>Departures within the next 60 minutes</div>
+    <div id="updated">Updating&hellip;</div>
+  </footer>
+
+<script>
+const API_URL = "https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
+const MAX_MINUTES = 60;
+const REFRESH_MS = 30000;
+
+function tickClock() {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function renderPlatform(el, trains) {
+  if (!trains.length) {
+    el.innerHTML = '<div class="empty">No trains in the next hour</div>';
+    return;
+  }
+  el.innerHTML = trains.map(t => {
+    const leaving = t.minutes === 0;
+    const minsHtml = leaving
+      ? '<div class="mins leaving">Now</div>'
+      : `<div class="mins">${t.minutes}<span class="unit">min</span></div>`;
+    return `<div class="train">
+      <div class="line-dot" style="background:${t.hexcolor}"></div>
+      <div class="dest">${t.destination}</div>
+      ${minsHtml}
+    </div>`;
+  }).join("");
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(API_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
+
+    const byPlatform = { "1": [], "2": [] };
+    for (const etd of etds) {
+      for (const est of etd.estimate) {
+        if (est.cancelflag === "1") continue;
+        const minutes = est.minutes === "Leaving" ? 0 : parseInt(est.minutes, 10);
+        if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
+        const platform = est.platform;
+        if (!byPlatform[platform]) byPlatform[platform] = [];
+        byPlatform[platform].push({
+          destination: etd.destination,
+          minutes,
+          hexcolor: est.hexcolor || "#888"
+        });
+      }
+    }
+    for (const key of Object.keys(byPlatform)) {
+      byPlatform[key].sort((a, b) => a.minutes - b.minutes);
+    }
+
+    renderPlatform(document.getElementById("platform1"), byPlatform["1"]);
+    renderPlatform(document.getElementById("platform2"), byPlatform["2"]);
+
+    document.getElementById("updated").textContent =
+      "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  } catch (err) {
+    document.getElementById("updated").textContent = "Update failed — retrying";
+    console.log("Refresh error:", err.message);
+  }
+}
+
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
