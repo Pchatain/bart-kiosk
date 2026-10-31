@@ -122,12 +122,15 @@
   }
   .error { color: #ff8a80; }
   footer {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 2vw;
     padding: 0.8vh 3vw 1.2vh;
     font-size: 1.8vh;
     color: var(--muted);
   }
+  footer .tag { letter-spacing: 0.15em; }
+  #updated { text-align: right; }
 </style>
 </head>
 <body>
@@ -147,6 +150,7 @@
   </main>
   <footer>
     <div>Departures within the next 30 minutes</div>
+    <div class="tag">GCCRCNPO</div>
     <div id="updated">Updating&hellip;</div>
   </footer>
 
