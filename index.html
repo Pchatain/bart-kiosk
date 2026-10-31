@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://api.bart.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Fruitvale BART Departures</title>
 <style>
   :root {
@@ -149,7 +151,8 @@
   </footer>
 
 <script>
-const API_URL = "https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
+// BART's published public demo key. Anything in client-side JS is public; don't put a private key here.
+const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
 const MAX_MINUTES = 60;
 const REFRESH_MS = 30000;
 
@@ -161,22 +164,38 @@ function tickClock() {
 setInterval(tickClock, 1000);
 tickClock();
 
+function div(className, text) {
+  const d = document.createElement("div");
+  d.className = className;
+  if (text !== undefined) d.textContent = text;
+  return d;
+}
+
 function renderPlatform(el, trains) {
   if (!trains.length) {
-    el.innerHTML = '<div class="empty">No trains in the next hour</div>';
+    el.replaceChildren(div("empty", "No trains in the next hour"));
     return;
   }
-  el.innerHTML = trains.map(t => {
-    const leaving = t.minutes === 0;
-    const minsHtml = leaving
-      ? '<div class="mins leaving">Now</div>'
-      : `<div class="mins">${t.minutes}<span class="unit">min</span></div>`;
-    return `<div class="train">
-      <div class="line-dot" style="background:${t.hexcolor}"></div>
-      <div class="dest">${t.destination}</div>
-      ${minsHtml}
-    </div>`;
-  }).join("");
+  el.replaceChildren(...trains.map(t => {
+    const row = div("train");
+
+    const dot = div("line-dot");
+    dot.style.background = /^#[0-9a-fA-F]{3,8}$/.test(t.hexcolor) ? t.hexcolor : "#888";
+
+    let mins;
+    if (t.minutes === 0) {
+      mins = div("mins leaving", "Now");
+    } else {
+      mins = div("mins", String(t.minutes));
+      const unit = document.createElement("span");
+      unit.className = "unit";
+      unit.textContent = "min";
+      mins.appendChild(unit);
+    }
+
+    row.append(dot, div("dest", t.destination), mins);
+    return row;
+  }));
 }
 
 async function refresh() {
