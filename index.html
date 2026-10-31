@@ -160,9 +160,14 @@ const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7S
 const MAX_MINUTES = 30;
 const REFRESH_MS = 30000;
 
-// Shorter names for long destinations, keyed by the name the BART API returns.
+// Short codes for destinations, keyed by the name the BART API returns.
+// Any destination not listed here is shown with its full name.
 const SHORT_NAMES = {
-  "Dublin/Pleasanton": "Dublin/PL"
+  "Berryessa": "BERY",
+  "Berryessa/North San Jose": "BERY",
+  "Dublin/Pleasanton": "DUB",
+  "Daly City": "DALY",
+  "Richmond": "RICH"
 };
 
 function tickClock() {
