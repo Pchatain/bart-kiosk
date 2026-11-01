@@ -67,48 +67,68 @@
     padding-bottom: 1vh;
     margin-bottom: 1vh;
   }
-  .platform h2 small {
-    display: block;
-    font-size: 2vh;
+  .cols {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2vw;
+    min-height: 0;
+  }
+  .cols.wide-left { grid-template-columns: 1.45fr 1fr; }
+  .col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+  .col-head {
+    font-size: 2.8vh;
+    font-weight: 700;
     color: var(--muted);
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    margin-top: 0.3vh;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 0.6vh;
+    border-bottom: 2px solid rgba(255,255,255,0.12);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .trains { flex: 1; overflow: hidden; }
   .train {
     display: flex;
     align-items: center;
     gap: 1vw;
-    padding: 1.4vh 0;
+    padding: 1.2vh 0;
     border-bottom: 1px solid rgba(255,255,255,0.08);
   }
   .train:last-child { border-bottom: none; }
   .line-dot {
-    width: 2.4vh;
-    height: 2.4vh;
+    width: 3.4vh;
+    height: 3.4vh;
     border-radius: 50%;
     flex-shrink: 0;
     border: 2px solid rgba(255,255,255,0.35);
   }
   .dest {
     flex: 1;
-    font-size: 3.4vh;
+    min-width: 0;
+    font-size: 4.4vh;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .mins {
-    font-size: 5.1vh;
+    margin-left: auto;
+    font-size: 9vh;
+    line-height: 1;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
   }
   .mins .unit {
-    font-size: 3vh;
+    font-size: 3.6vh;
     font-weight: 500;
     color: var(--muted);
     margin-left: 0.4vw;
@@ -140,12 +160,18 @@
   </header>
   <main>
     <section class="platform">
-      <h2>Platform 1 <small>Toward Berryessa &amp; Dublin</small></h2>
-      <div class="trains" id="platform1"><div class="empty">Loading&hellip;</div></div>
+      <h2>Platform 1</h2>
+      <div class="cols">
+        <div class="col"><div class="col-head">Berryessa</div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head">Dublin</div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
+      </div>
     </section>
     <section class="platform">
-      <h2>Platform 2 <small>Toward Oakland &amp; San Francisco</small></h2>
-      <div class="trains" id="platform2"><div class="empty">Loading&hellip;</div></div>
+      <h2>Platform 2</h2>
+      <div class="cols wide-left">
+        <div class="col"><div class="col-head">San Francisco</div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head">Richmond</div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
+      </div>
     </section>
   </main>
   <footer>
@@ -167,8 +193,28 @@ const SHORT_NAMES = {
   "Berryessa/North San Jose": "BERY",
   "Dublin/Pleasanton": "DUB",
   "Daly City": "DALY",
-  "Richmond": "RICH"
+  "Richmond": "RICH",
+  "SF Airport": "SFIA",
+  "SFO/Millbrae": "SFIA",
+  "Millbrae": "MLBR"
 };
+
+// Which column each train goes in. A train goes in the first column on its
+// platform that lists its destination; anything unlisted goes in that
+// platform's fallback column. Rows show the destination name only when the
+// column holds more than one destination (or the train isn't one it lists).
+const COLUMNS = [
+  { id: "col-bery", platform: "1", dests: ["Berryessa", "Berryessa/North San Jose"], fallback: true },
+  { id: "col-dub",  platform: "1", dests: ["Dublin/Pleasanton"] },
+  { id: "col-sf",   platform: "2", dests: [], fallback: true, showDest: true },
+  { id: "col-rich", platform: "2", dests: ["Richmond"] }
+];
+
+function columnFor(platform, destination) {
+  const onPlatform = COLUMNS.filter(c => c.platform === platform);
+  return onPlatform.find(c => c.dests.includes(destination)) ||
+         onPlatform.find(c => c.fallback) || null;
+}
 
 function tickClock() {
   const now = new Date();
@@ -185,9 +231,9 @@ function div(className, text) {
   return d;
 }
 
-function renderPlatform(el, trains) {
+function renderColumn(el, trains) {
   if (!trains.length) {
-    el.replaceChildren(div("empty", "No trains in the next 30 minutes"));
+    el.replaceChildren(div("empty", "No trains"));
     return;
   }
   el.replaceChildren(...trains.map(t => {
@@ -207,9 +253,18 @@ function renderPlatform(el, trains) {
       mins.appendChild(unit);
     }
 
-    row.append(dot, div("dest", t.destination), mins);
+    if (t.showDest) {
+      row.append(dot, div("dest", t.destination), mins);
+    } else {
+      row.append(dot, mins);
+    }
     return row;
   }));
+  // Drop rows that don't fully fit rather than showing half a row.
+  const bottom = el.getBoundingClientRect().bottom;
+  for (const row of [...el.children]) {
+    if (row.getBoundingClientRect().bottom > bottom + 1) row.remove();
+  }
 }
 
 async function refresh() {
@@ -219,27 +274,27 @@ async function refresh() {
     const data = await res.json();
     const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
 
-    const byPlatform = { "1": [], "2": [] };
+    const byColumn = {};
+    for (const c of COLUMNS) byColumn[c.id] = [];
     for (const etd of etds) {
       for (const est of etd.estimate) {
         if (est.cancelflag === "1") continue;
         const minutes = est.minutes === "Leaving" ? 0 : parseInt(est.minutes, 10);
         if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
-        const platform = est.platform;
-        if (!byPlatform[platform]) byPlatform[platform] = [];
-        byPlatform[platform].push({
+        const col = columnFor(est.platform, etd.destination);
+        if (!col) continue;
+        byColumn[col.id].push({
           destination: SHORT_NAMES[etd.destination] || etd.destination,
+          showDest: col.showDest || !col.dests.includes(etd.destination),
           minutes,
           hexcolor: est.hexcolor || "#888"
         });
       }
     }
-    for (const key of Object.keys(byPlatform)) {
-      byPlatform[key].sort((a, b) => a.minutes - b.minutes);
+    for (const c of COLUMNS) {
+      byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
+      renderColumn(document.getElementById(c.id), byColumn[c.id]);
     }
-
-    renderPlatform(document.getElementById("platform1"), byPlatform["1"]);
-    renderPlatform(document.getElementById("platform2"), byPlatform["2"]);
 
     document.getElementById("updated").textContent =
       "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
