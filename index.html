@@ -28,16 +28,16 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    padding: 2vh 3vw 1vh;
+    padding: 2vmin 3vw 1vmin;
   }
   header h1 {
-    font-size: 5vh;
+    font-size: 5vmin;
     font-weight: 800;
     letter-spacing: 0.02em;
   }
   header h1 span { color: var(--accent); }
   #clock {
-    font-size: 4.5vh;
+    font-size: 4.5vmin;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
@@ -45,79 +45,94 @@
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2vh;
-    padding: 0 2vw 1vh;
+    gap: 2vmin;
+    padding: 0 2vw 1vmin;
     min-height: 0;
   }
   .platform {
     background: var(--panel);
-    border-radius: 1.5vh;
-    padding: 1.5vh 1.5vw;
+    border-radius: 1.5vmin;
+    padding: 1.5vmin 1.5vw;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
   }
   .platform h2 {
-    font-size: 3.6vh;
+    font-size: 3vmin;
     color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    border-bottom: 2px solid rgba(255,255,255,0.12);
-    padding-bottom: 1vh;
-    margin-bottom: 1vh;
+    margin-bottom: 0.6vmin;
   }
-  .platform h2 small {
-    display: block;
-    font-size: 2vh;
+  .cols {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2vw;
+    min-height: 0;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+  }
+  .col-head {
+    font-size: 2.8vmin;
+    font-weight: 700;
     color: var(--muted);
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    margin-top: 0.3vh;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 0.6vmin;
+    border-bottom: 2px solid rgba(255,255,255,0.12);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .trains { flex: 1; overflow: hidden; }
   .train {
     display: flex;
     align-items: center;
-    gap: 1vw;
-    padding: 1.4vh 0;
+    gap: 0.8vw;
+    padding: 0.8vmin 0;
     border-bottom: 1px solid rgba(255,255,255,0.08);
   }
   .train:last-child { border-bottom: none; }
   .line-dot {
-    width: 2.4vh;
-    height: 2.4vh;
+    width: 3.6vmin;
+    height: 3.6vmin;
     border-radius: 50%;
     flex-shrink: 0;
     border: 2px solid rgba(255,255,255,0.35);
   }
   .dest {
     flex: 1;
-    font-size: 3.4vh;
+    min-width: 0;
+    font-size: 4.4vmin;
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .mins {
-    font-size: 5.1vh;
+    margin-left: auto;
+    /* Landscape: sized so 4 rows fit per column (17% of height), capped so
+       "88" plus the dot fit a column (a quarter of the width). On landscape
+       screens vmin is the height, so this is min(17vh, 12.5vw). */
+    font-size: min(17vmin, 12.5vw);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
   }
-  .mins .unit {
-    font-size: 3vh;
-    font-weight: 500;
-    color: var(--muted);
-    margin-left: 0.4vw;
-  }
-  .mins.leaving { color: #ffd34d; }
+  .mins.leaving { color: #ffd34d; font-size: min(12vmin, 7.5vw); }
   .empty, .error {
-    font-size: 2.8vh;
+    font-size: 2.8vmin;
     color: var(--muted);
-    padding: 3vh 0;
+    padding: 3vmin 0;
     text-align: center;
   }
   .error { color: #ff8a80; }
@@ -125,12 +140,19 @@
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     gap: 2vw;
-    padding: 0.8vh 3vw 1.2vh;
-    font-size: 1.8vh;
+    padding: 0.8vmin 3vw 1.2vmin;
+    font-size: 1.8vmin;
     color: var(--muted);
   }
   footer .tag { letter-spacing: 0.15em; }
   #updated { text-align: right; }
+  /* Portrait screens: stack the two platforms instead of side by side. */
+  @media (orientation: portrait) {
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    /* Each column is now ~45% of the width and ~35-40% of the height. */
+    .mins { font-size: min(7.5vh, 30vw); }
+    .mins.leaving { font-size: min(5.5vh, 17vw); }
+  }
 </style>
 </head>
 <body>
@@ -140,16 +162,22 @@
   </header>
   <main>
     <section class="platform">
-      <h2>Platform 1 <small>Toward Berryessa &amp; Dublin</small></h2>
-      <div class="trains" id="platform1"><div class="empty">Loading&hellip;</div></div>
+      <h2>Platform 1</h2>
+      <div class="cols">
+        <div class="col"><div class="col-head">Berryessa</div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head">Dublin</div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
+      </div>
     </section>
     <section class="platform">
-      <h2>Platform 2 <small>Toward Oakland &amp; San Francisco</small></h2>
-      <div class="trains" id="platform2"><div class="empty">Loading&hellip;</div></div>
+      <h2>Platform 2</h2>
+      <div class="cols">
+        <div class="col"><div class="col-head">San Francisco</div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head">Richmond</div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
+      </div>
     </section>
   </main>
   <footer>
-    <div>Departures within the next 30 minutes</div>
+    <div>Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <div id="updated">Updating&hellip;</div>
   </footer>
@@ -157,7 +185,7 @@
 <script>
 // BART's published public demo key. Anything in client-side JS is public; don't put a private key here.
 const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
-const MAX_MINUTES = 30;
+const MAX_MINUTES = 60;
 const REFRESH_MS = 30000;
 
 // Short codes for destinations, keyed by the name the BART API returns.
@@ -169,6 +197,23 @@ const SHORT_NAMES = {
   "Daly City": "DALY",
   "Richmond": "RICH"
 };
+
+// Which column each train goes in. A train goes in the first column on its
+// platform that lists its destination; anything unlisted goes in that
+// platform's fallback column. Rows show only the line-color dot and minutes;
+// the destination name appears only for a train the column doesn't list.
+const COLUMNS = [
+  { id: "col-bery", platform: "1", dests: ["Berryessa", "Berryessa/North San Jose"], fallback: true },
+  { id: "col-dub",  platform: "1", dests: ["Dublin/Pleasanton"] },
+  { id: "col-sf",   platform: "2", dests: ["Daly City", "SF Airport"], fallback: true },
+  { id: "col-rich", platform: "2", dests: ["Richmond"] }
+];
+
+function columnFor(platform, destination) {
+  const onPlatform = COLUMNS.filter(c => c.platform === platform);
+  return onPlatform.find(c => c.dests.includes(destination)) ||
+         onPlatform.find(c => c.fallback) || null;
+}
 
 function tickClock() {
   const now = new Date();
@@ -185,9 +230,9 @@ function div(className, text) {
   return d;
 }
 
-function renderPlatform(el, trains) {
+function renderColumn(el, trains) {
   if (!trains.length) {
-    el.replaceChildren(div("empty", "No trains in the next 30 minutes"));
+    el.replaceChildren(div("empty", "No trains"));
     return;
   }
   el.replaceChildren(...trains.map(t => {
@@ -201,15 +246,20 @@ function renderPlatform(el, trains) {
       mins = div("mins leaving", "Now");
     } else {
       mins = div("mins", String(t.minutes));
-      const unit = document.createElement("span");
-      unit.className = "unit";
-      unit.textContent = "min";
-      mins.appendChild(unit);
     }
 
-    row.append(dot, div("dest", t.destination), mins);
+    if (t.showDest) {
+      row.append(dot, div("dest", t.destination), mins);
+    } else {
+      row.append(dot, mins);
+    }
     return row;
   }));
+  // Drop rows that don't fully fit rather than showing half a row.
+  const bottom = el.getBoundingClientRect().bottom;
+  for (const row of [...el.children]) {
+    if (row.getBoundingClientRect().bottom > bottom + 1) row.remove();
+  }
 }
 
 async function refresh() {
@@ -219,27 +269,27 @@ async function refresh() {
     const data = await res.json();
     const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
 
-    const byPlatform = { "1": [], "2": [] };
+    const byColumn = {};
+    for (const c of COLUMNS) byColumn[c.id] = [];
     for (const etd of etds) {
       for (const est of etd.estimate) {
         if (est.cancelflag === "1") continue;
         const minutes = est.minutes === "Leaving" ? 0 : parseInt(est.minutes, 10);
         if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
-        const platform = est.platform;
-        if (!byPlatform[platform]) byPlatform[platform] = [];
-        byPlatform[platform].push({
+        const col = columnFor(est.platform, etd.destination);
+        if (!col) continue;
+        byColumn[col.id].push({
           destination: SHORT_NAMES[etd.destination] || etd.destination,
+          showDest: !col.dests.includes(etd.destination),
           minutes,
           hexcolor: est.hexcolor || "#888"
         });
       }
     }
-    for (const key of Object.keys(byPlatform)) {
-      byPlatform[key].sort((a, b) => a.minutes - b.minutes);
+    for (const c of COLUMNS) {
+      byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
+      renderColumn(document.getElementById(c.id), byColumn[c.id]);
     }
-
-    renderPlatform(document.getElementById("platform1"), byPlatform["1"]);
-    renderPlatform(document.getElementById("platform2"), byPlatform["2"]);
 
     document.getElementById("updated").textContent =
       "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
