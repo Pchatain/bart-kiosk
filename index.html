@@ -13,6 +13,8 @@
     --text: #f2f6ff;
     --muted: #8da2c0;
     --accent: #4da3ff;
+    --minor: #ffe08a;   /* 3-4 min late */
+    --major: #ff4d4f;   /* 5+ min late */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
@@ -41,6 +43,8 @@
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
+
+  /* ---- Platforms and the draggable divider ---- */
   main {
     /* --split: Platform 1's share of the width (0.4 = 40%). Set by dragging the divider. */
     --split: 0.4;
@@ -49,7 +53,10 @@
     display: flex;
     padding: 0 2vw 1vmin;
     min-height: 0;
+    transition: opacity 0.5s;
   }
+  /* Data hasn't updated for a while: fade the board (the footer says how old it is). */
+  main.stale { opacity: 0.45; filter: grayscale(1); }
   .platform {
     flex: 1 1 0;
     min-width: 0;
@@ -85,6 +92,8 @@
     border-radius: 0.2vmin;
   }
   #divider.dragging, #divider:focus-visible { background: var(--accent); outline: none; }
+
+  /* ---- Columns ---- */
   .cols {
     flex: 1;
     display: grid;
@@ -92,7 +101,7 @@
     min-height: 0;
   }
   /* Thin gray line between the two columns in each half. */
-  .col:first-child { padding-right: 1.2vw; }
+  .col:first-child { padding-right: 1.2vw; border-right: 2px solid transparent; }   /* same width as the bordered column */
   .col + .col { padding-left: 1.2vw; border-left: 2px solid rgba(255,255,255,0.14); }
   .col {
     display: flex;
@@ -113,7 +122,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .trains { flex: 1; overflow: hidden; }
+
+  /* ---- Number sizing ----
+     Each column is a size container, so its numbers can be sized from its own
+     height and width (cqh/cqw). The script only sets, per platform:
+       --rows   how many rows to fit (3 or 4)
+       --ratio  how wide a row is in "number font sizes": 1.3 fits "88";
+                2.0 also leaves room for a "+N" late badge
+       --fit    a correction factor (normally 1) if the result still overflows,
+                e.g. because of a browser text-zoom setting
+     Browsers without container units get --num-base/--now-base set in pixels
+     by the script, using the same formula (see sizeWithoutContainerUnits). */
+  .trains {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    container-type: size;
+    --side: calc(3.6vmin + 0.8vw);   /* dot + gap */
+    /* Largest number that fits --rows rows (row = 0.95 x font + 1.6vmin padding + 1px line)
+       and fits the column width. */
+    --num-base: min((100cqh / var(--rows, 3) - 1.6vmin - 1px) / 0.95,
+                    (100cqw - var(--side)) / var(--ratio, 1.3));
+    /* "Now" is about 1.75x wider than "88", so it gets its own size. */
+    --now-base: min(var(--num-base) * 0.72, (100cqw - var(--side)) / 2.3);
+    --num: calc(var(--num-base) * var(--fit, 1));
+    --now: calc(var(--now-base) * var(--fit, 1));
+  }
   .train {
     display: flex;
     align-items: center;
@@ -143,12 +177,7 @@
   .mins {
     min-width: 2ch;
     flex-shrink: 0;
-    /* Landscape: sized so 4 rows fit per column (17% of height), capped so
-       "88" plus the dot fit a column (a quarter of the width). On landscape
-       screens vmin is the height, so this is min(17vh, 12.5vw). */
-    /* The script sets --num per column to the largest size that fits 4 rows;
-       this fallback is only used if the script hasn't run. */
-    font-size: var(--num, min(17vmin, 12.5vw));
+    font-size: var(--num);
     line-height: 0.95;
     letter-spacing: -0.02em;
     font-weight: 800;
@@ -156,24 +185,31 @@
     text-align: right;
     white-space: nowrap;
   }
-  .mins.leaving { color: #ffd34d; font-size: var(--now, min(12vmin, 7.5vw)); }
+  .mins.leaving { color: #ffd34d; font-size: var(--now); }
   /* Late trains (3+ min): an outline around the number plus a "+N" badge beside
      it, both light yellow for 3-4 min late and red for 5+. */
   .mins.late { box-shadow: 0 0 0 0.045em var(--late-color); border-radius: 0.14em; padding: 0 0.06em; }
-  .mins.late.minor { --late-color: #ffe08a; }
-  .mins.late.major { --late-color: #ff4d4f; }
+  .mins.late.minor { --late-color: var(--minor); }
+  .mins.late.major { --late-color: var(--major); }
   .late-badge {
     align-self: flex-start;
-    font-size: calc(var(--num, 10vmin) * 0.26);
+    font-size: calc(var(--num) * 0.26);
     font-weight: 800;
     line-height: 1;
     padding: 0.18em 0.42em;
     border-radius: 999px;
     white-space: nowrap;
   }
-  .late-badge.minor { background: #ffe08a; color: #3a2a00; }
-  .late-badge.major { background: #ff4d4f; color: #fff; }
-  /* Scrolling message strip above the footer; hidden when there's nothing to say. */
+  .late-badge.minor { background: var(--minor); color: #3a2a00; }
+  .late-badge.major { background: var(--major); color: #fff; }
+  .empty {
+    font-size: 2.8vmin;
+    color: var(--muted);
+    padding: 3vmin 0;
+    text-align: center;
+  }
+
+  /* ---- Ticker: scrolling messages above the footer; hidden when there's nothing to say ---- */
   #ticker {
     flex: 0 0 auto;
     margin: 0 2vw;
@@ -189,13 +225,7 @@
   }
   #ticker[hidden] { display: none; }
   #ticker-text { display: inline-block; will-change: transform; }
-  .empty, .error {
-    font-size: 2.8vmin;
-    color: var(--muted);
-    padding: 3vmin 0;
-    text-align: center;
-  }
-  .error { color: #ff8a80; }
+
   footer {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -206,7 +236,9 @@
   }
   footer .tag { letter-spacing: 0.15em; }
   footer .right { text-align: right; }
+  #status.problem { color: #ff8a80; }
   #version { margin-left: 1em; opacity: 0.6; }
+
   /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
     main { flex-direction: column; }
@@ -223,14 +255,14 @@
     <div id="clock">--:--</div>
   </header>
   <main>
-    <section class="platform p1" aria-label="Platform 1">
+    <section class="platform p1" data-platform="1" aria-label="Platform 1">
       <div class="cols">
         <div class="col"><div class="col-head"><span class="plat">#1</span><span class="name" data-full="Berryessa" data-short="BERY">Berryessa</span></div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
         <div class="col"><div class="col-head"><span class="plat">#1</span><span class="name" data-full="Dublin" data-short="DUB">Dublin</span></div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
     <div id="divider" role="separator" aria-label="Drag to resize platforms" tabindex="0"></div>
-    <section class="platform p2" aria-label="Platform 2">
+    <section class="platform p2" data-platform="2" aria-label="Platform 2">
       <div class="cols">
         <div class="col"><div class="col-head"><span class="plat">#2</span><span class="name" data-full="San Francisco" data-short="SF">San Francisco</span></div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
         <div class="col"><div class="col-head"><span class="plat">#2</span><span class="name" data-full="Richmond" data-short="RICH">Richmond</span></div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
@@ -242,17 +274,43 @@
     <div>Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="updated">Updating&hellip;</span><span id="version">v9</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v9.1</span></div>
   </footer>
 
 <script>
+"use strict";
+
+// =============================================================================
+// Settings
+// =============================================================================
 // BART's published public demo key. Anything in client-side JS is public; don't put a private key here.
-const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
-const MAX_MINUTES = 60;
-const REFRESH_MS = 30000;
+const BART_KEY = "MW9S-E7SL-26DU-VV8V";
+const DEPARTURES_URL = `https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=${BART_KEY}&json=y`;
+const ADVISORIES_URL = `https://api.bart.gov/api/bsa.aspx?cmd=bsa&key=${BART_KEY}&json=y`;
+
+const TIME_ZONE = "America/Los_Angeles";   // show Bay Area time even if the tablet's zone is wrong
+const MAX_MINUTES = 60;                    // ignore trains further out than this
+const DEPARTURES_EVERY_MS = 30 * 1000;
+const ADVISORIES_EVERY_MS = 60 * 1000;
+const UPDATE_CHECK_EVERY_MS = 5 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 10 * 1000;
+const STALE_AFTER_FAILURES = 3;            // fade the board after this many failed refreshes in a row
+
+const LATE_THRESHOLD_MIN = 3;              // delays of 2 min or less are ignored
+const MAJOR_DELAY_MIN = 5;                 // 3-4 min late: light yellow; 5+: red
+const TICKER_SPEED_VMIN_PER_S = 14;        // ticker speed, in % of the screen's shorter side per second
+
+// Rows each platform is sized for, from its busiest column: BART usually sends
+// 3 trains per destination, sometimes more when two lines share a column.
+const MIN_ROWS = 3;
+const MAX_ROWS = 4;
+const WIDTH_RATIO = 1.3;                   // row width in number-font-sizes: fits "88"
+const WIDTH_RATIO_WITH_BADGE = 2.0;        // ...plus a "+N" late badge
+
+const DEFAULT_SPLIT = 0.4;                 // Platform 1's default share of the width
+const SPLIT_KEY = "kiosk-split";
 
 // Short codes for destinations, keyed by the name the BART API returns.
-// Any destination not listed here is shown with its full name.
 const SHORT_NAMES = {
   "Berryessa": "BERY",
   "Berryessa/North San Jose": "BERY",
@@ -263,14 +321,42 @@ const SHORT_NAMES = {
 
 // Which column each train goes in. A train goes in the first column on its
 // platform that lists its destination; anything unlisted goes in that
-// platform's fallback column. Rows show only the line-color dot and minutes;
-// the destination name appears only for a train the column doesn't list.
+// platform's fallback column and shows its name (the only rows that do).
 const COLUMNS = [
   { id: "col-bery", platform: "1", dests: ["Berryessa", "Berryessa/North San Jose"], fallback: true },
   { id: "col-dub",  platform: "1", dests: ["Dublin/Pleasanton"] },
   { id: "col-sf",   platform: "2", dests: ["Daly City", "SF Airport"], fallback: true },
   { id: "col-rich", platform: "2", dests: ["Richmond"] }
 ];
+const PLATFORMS = ["1", "2"];
+
+// Container units (cqw/cqh) let CSS do the sizing. Older browsers get the same
+// formula computed in the script. "?nocq" in the address forces that path, for testing.
+const USE_CONTAINER_UNITS = CSS.supports("height: 1cqh") && !/[?&]nocq\b/.test(location.search);
+
+// =============================================================================
+// State: everything the screen shows comes from here
+// =============================================================================
+const state = {
+  departures: null,    // { byColumn: {colId: [train]}, fetchedAt } from the last successful refresh
+  failures: 0,         // failed departure refreshes in a row
+  advisories: []       // BART service advisory texts
+};
+
+// =============================================================================
+// Data: fetch from BART and turn it into plain objects (no DOM here)
+// =============================================================================
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function columnFor(platform, destination) {
   const onPlatform = COLUMNS.filter(c => c.platform === platform);
@@ -278,13 +364,80 @@ function columnFor(platform, destination) {
          onPlatform.find(c => c.fallback) || null;
 }
 
-function tickClock() {
-  const now = new Date();
-  document.getElementById("clock").textContent =
-    now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+// BART reports each train's delay in seconds. Returns whole minutes late
+// (rounded), or 0 if that's under the threshold.
+function lateMinutes(delaySeconds) {
+  const min = Math.round((parseInt(delaySeconds, 10) || 0) / 60);
+  return min >= LATE_THRESHOLD_MIN ? min : 0;
 }
-setInterval(tickClock, 1000);
-tickClock();
+
+// Returns { byColumn: {colId: [{destination, shortName, showDest, minutes, lateMin, color}]} }.
+async function fetchDepartures() {
+  const data = await fetchJson(DEPARTURES_URL);
+  const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
+  const byColumn = {};
+  for (const c of COLUMNS) byColumn[c.id] = [];
+  for (const etd of etds) {
+    for (const est of etd.estimate) {
+      if (est.cancelflag === "1") continue;
+      const minutes = est.minutes === "Leaving" ? 0 : parseInt(est.minutes, 10);
+      if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
+      const col = columnFor(est.platform, etd.destination);
+      if (!col) continue;
+      byColumn[col.id].push({
+        destination: etd.destination,
+        shortName: SHORT_NAMES[etd.destination] || etd.destination,
+        showDest: !col.dests.includes(etd.destination),
+        minutes,
+        lateMin: lateMinutes(est.delay),
+        color: /^#[0-9a-fA-F]{3,8}$/.test(est.hexcolor) ? est.hexcolor : "#888"
+      });
+    }
+  }
+  for (const c of COLUMNS) byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
+  return { byColumn };
+}
+
+// Returns a list of advisory texts (empty when BART says there are none).
+async function fetchAdvisories() {
+  const data = await fetchJson(ADVISORIES_URL);
+  return [].concat((data.root && data.root.bsa) || [])
+    .map(a => ((a.description && a.description["#cdata-section"]) || "").trim())
+    .filter(text => text && !/^no advisories/i.test(text));
+}
+
+// =============================================================================
+// Updates: fetch, store in state, redraw
+// =============================================================================
+async function updateDepartures() {
+  try {
+    const { byColumn } = await fetchDepartures();
+    state.departures = { byColumn, fetchedAt: Date.now() };
+    state.failures = 0;
+  } catch (err) {
+    state.failures++;
+    console.log("Departures error:", err.message);
+  }
+  render();
+}
+
+async function updateAdvisories() {
+  try {
+    state.advisories = await fetchAdvisories();
+  } catch (err) {
+    console.log("Advisories error:", err.message);   // keep the previous ones
+  }
+  render();
+}
+
+// =============================================================================
+// Rendering
+// =============================================================================
+function formatTime(date, withSeconds) {
+  return date.toLocaleTimeString([], {
+    hour: "numeric", minute: "2-digit", second: withSeconds ? "2-digit" : undefined, timeZone: TIME_ZONE
+  });
+}
 
 function div(className, text) {
   const d = document.createElement("div");
@@ -293,96 +446,127 @@ function div(className, text) {
   return d;
 }
 
-function renderColumn(el, trains) {
-  if (!trains.length) {
-    el.replaceChildren(div("empty", "No trains"));
-    return;
+// Trains per column as of now: if the data is a few minutes old (BART not
+// responding), count the minutes down and drop trains that have left.
+function currentTrains() {
+  if (!state.departures) return null;
+  const elapsed = Math.floor((Date.now() - state.departures.fetchedAt) / 60000);
+  const out = {};
+  for (const c of COLUMNS) {
+    out[c.id] = state.departures.byColumn[c.id]
+      .map(t => ({ ...t, minutes: t.minutes - elapsed }))
+      .filter(t => t.minutes >= 0);
   }
-  el.replaceChildren(...trains.map(t => {
-    const row = div("train");
+  return out;
+}
 
-    const dot = div("line-dot");
-    dot.style.background = /^#[0-9a-fA-F]{3,8}$/.test(t.hexcolor) ? t.hexcolor : "#888";
+function renderRow(t) {
+  const row = div("train");
+  const dot = div("line-dot");
+  dot.style.background = t.color;
+  const mins = t.minutes === 0 ? div("mins leaving", "Now") : div("mins", String(t.minutes));
+  const parts = t.showDest ? [dot, div("dest", t.shortName), mins] : [dot, mins];
+  if (t.lateMin) {
+    const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
+    mins.classList.add("late", severity);
+    parts.push(div("late-badge " + severity, "+" + t.lateMin));
+  }
+  row.append(...parts);
+  return row;
+}
 
-    let mins;
-    if (t.minutes === 0) {
-      mins = div("mins leaving", "Now");
-    } else {
-      mins = div("mins", String(t.minutes));
+function renderBoard(trains) {
+  for (const platform of PLATFORMS) {
+    const platEl = document.querySelector(`.platform[data-platform="${platform}"]`);
+    const columns = COLUMNS.filter(c => c.platform === platform);
+    const busiest = Math.max(...columns.map(c => trains[c.id].length));
+    const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, busiest));
+    const shown = columns.map(c => trains[c.id].slice(0, rows));
+    const hasBadge = shown.some(list => list.some(t => t.lateMin));
+    platEl.style.setProperty("--rows", rows);
+    platEl.style.setProperty("--ratio", hasBadge ? WIDTH_RATIO_WITH_BADGE : WIDTH_RATIO);
+    columns.forEach((c, i) => {
+      const el = document.getElementById(c.id);
+      el.replaceChildren(...(shown[i].length ? shown[i].map(renderRow) : [div("empty", "No trains")]));
+    });
+  }
+}
+
+// Worst delays first, then BART's advisories.
+function tickerMessages(trains) {
+  const late = trains ? Object.values(trains).flat().filter(t => t.lateMin) : [];
+  const delays = late
+    .sort((a, b) => b.lateMin - a.lateMin || a.minutes - b.minutes)
+    .map(t => `${t.destination} train ${t.minutes === 0 ? "leaving now" : "in " + t.minutes + " min"} is running ${t.lateMin} min late`);
+  return [...delays, ...state.advisories.map(a => "BART: " + a)];
+}
+
+function renderStatus() {
+  const status = document.getElementById("status");
+  const stale = state.failures >= STALE_AFTER_FAILURES && state.departures;
+  document.querySelector("main").classList.toggle("stale", !!stale);
+  status.classList.toggle("problem", state.failures > 0);
+  if (!state.departures && state.failures === 0) {
+    status.textContent = "Updating…";
+  } else if (state.failures === 0) {
+    status.textContent = "Updated " + formatTime(new Date(state.departures.fetchedAt), true);
+  } else if (stale) {
+    status.textContent = "Data from " + formatTime(new Date(state.departures.fetchedAt), false) + " — retrying";
+  } else {
+    status.textContent = "Update failed — retrying";
+  }
+}
+
+function render() {
+  const trains = currentTrains();
+  if (trains) renderBoard(trains);
+  setTicker(tickerMessages(trains));
+  renderStatus();
+  fitAll();
+}
+
+// =============================================================================
+// Fitting: CSS sizes the numbers; this only corrects what CSS can't know
+// =============================================================================
+// How much a platform's content needs to shrink to fit (1 = fits).
+function overflowScale(platEl) {
+  let scale = 1;
+  for (const col of platEl.querySelectorAll(".trains")) {
+    scale = Math.min(scale, col.clientHeight / Math.max(col.scrollHeight, 1));
+    for (const row of col.querySelectorAll(".train")) {
+      scale = Math.min(scale, row.clientWidth / Math.max(row.scrollWidth, 1));
     }
-
-    const parts = t.showDest ? [dot, div("dest", t.destination), mins] : [dot, mins];
-    if (t.lateMin) {
-      const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
-      mins.classList.add("late", severity);
-      parts.push(div("late-badge " + severity, "+" + t.lateMin));
-    }
-    row.append(...parts);
-    return row;
-  }));
-}
-
-// ---- Sizing -------------------------------------------------------------
-// Each column gets the largest numbers that fit 3 or 4 rows (see below) in its
-// height and "88" (plus the dot) in its width. The columns can be different
-// widths (the divider is draggable), so this is measured per column. After
-// sizing, it checks what actually rendered and shrinks until it fits, which
-// also covers browser text-zoom settings the math can't see.
-// Rows to size for, chosen per platform from its busiest column: BART usually
-// sends 3 trains per destination, sometimes more when two lines share a column.
-const MIN_ROWS = 3;
-const MAX_ROWS = 4;
-
-function rowsFit(el, n) {
-  const box = el.getBoundingClientRect();
-  const rows = [...el.querySelectorAll(".train")].slice(0, n);
-  for (const row of rows) {
-    if (row.getBoundingClientRect().bottom > box.bottom + 1) return false;
-    const mins = row.querySelector(".mins");
-    const dot = row.querySelector(".line-dot");
-    const range = document.createRange();
-    range.selectNodeContents(mins);
-    const text = range.getBoundingClientRect();
-    const minsBox = mins.getBoundingClientRect();
-    if (text.right > box.right + 1 || text.left < dot.getBoundingClientRect().right + 1) return false;
-    if (text.right > minsBox.right + 1 || text.left < minsBox.left - 1) return false;   // text spilling out of its own box
-    const badge = row.querySelector(".late-badge");
-    if (badge && badge.getBoundingClientRect().right > box.right + 1) return false;
   }
-  return true;
+  return scale;
 }
 
-function fitColumn(el, rowsToFit) {
-  const rows = el.querySelectorAll(".train");
-  if (!rows.length) return Infinity;
+// Same formula as the --num-base/--now-base CSS, in pixels, for browsers
+// without container units.
+function sizeWithoutContainerUnits(platEl) {
   const vmin = Math.min(innerWidth, innerHeight) / 100;
-  const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;   // dot + gap + slack
-  const rowExtra = 1.6 * vmin + 1;                         // row padding + divider line
-  const widthRatio = el.querySelector(".late-badge") ? 2.0 : 1.3;   // room for a "+N" badge
-  let num = Math.min((el.clientHeight / rowsToFit - rowExtra) / 0.95,
-                     (el.clientWidth - side) / widthRatio);
-  const n = Math.min(rowsToFit, rows.length);
-  for (let i = 0; i < 25; i++) {
-    setColumnSize(el, num);
-    if (num <= 8 || rowsFit(el, n)) break;
-    num *= 0.95;
+  const side = 3.6 * vmin + 0.8 * innerWidth / 100;
+  const style = getComputedStyle(platEl);
+  const rows = parseFloat(style.getPropertyValue("--rows")) || MIN_ROWS;
+  const ratio = parseFloat(style.getPropertyValue("--ratio")) || WIDTH_RATIO;
+  for (const col of platEl.querySelectorAll(".trains")) {
+    const num = Math.min((col.clientHeight / rows - 1.6 * vmin - 1) / 0.95, (col.clientWidth - side) / ratio);
+    const now = Math.min(num * 0.72, (col.clientWidth - side) / 2.3);
+    col.style.setProperty("--num-base", Math.max(num, 8) + "px");
+    col.style.setProperty("--now-base", Math.max(now, 8) + "px");
   }
-  return num;
 }
 
-function setColumnSize(el, num) {
-  const vmin = Math.min(innerWidth, innerHeight) / 100;
-  const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;
-  const now = Math.min(num * 0.72, (el.clientWidth - side) / 2.3);
-  el.style.setProperty("--num", Math.max(num, 8) + "px");
-  el.style.setProperty("--now", Math.max(now, 8) + "px");
-}
-
-// Drop rows that don't fully fit rather than showing half a row.
-function dropOverflowRows(el) {
-  const bottom = el.getBoundingClientRect().bottom;
-  for (const row of [...el.querySelectorAll(".train")]) {
-    if (row.getBoundingClientRect().bottom > bottom + 1) row.remove();
+// Start from the CSS size; if anything still overflows (text zoom, odd fonts),
+// scale down by the measured overflow. Usually one measurement, at most a few.
+function fitPlatform(platEl) {
+  if (!USE_CONTAINER_UNITS) sizeWithoutContainerUnits(platEl);
+  let fit = 1;
+  platEl.style.setProperty("--fit", fit);
+  for (let i = 0; i < 4; i++) {
+    const scale = overflowScale(platEl);
+    if (scale >= 0.999) break;
+    fit *= scale * 0.98;
+    platEl.style.setProperty("--fit", fit.toFixed(4));
   }
 }
 
@@ -403,121 +587,30 @@ function fitHeaders() {
   }
 }
 
-let lastTrains = null;   // trains per column from the most recent refresh
-
-function layout() {
+function fitAll() {
   fitHeaders();
-  if (!lastTrains) return;
-  for (const c of COLUMNS) renderColumn(document.getElementById(c.id), lastTrains[c.id]);
-  // Both columns on a platform use the same size: the smaller of their best fits.
-  for (const platform of ["1", "2"]) {
-    const els = COLUMNS.filter(c => c.platform === platform).map(c => document.getElementById(c.id));
-    const columns = COLUMNS.filter(c => c.platform === platform);
-    const busiest = Math.max(...columns.map(c => lastTrains[c.id].length));
-    const rowsToFit = Math.min(MAX_ROWS, Math.max(MIN_ROWS, busiest));
-    const num = Math.min(...els.map(el => fitColumn(el, rowsToFit)));
-    for (const el of els) {
-      if (isFinite(num)) setColumnSize(el, num);
-      dropOverflowRows(el);
-    }
-  }
+  for (const platEl of document.querySelectorAll(".platform")) fitPlatform(platEl);
 }
 
-async function refresh() {
-  try {
-    const res = await fetch(API_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
+// Refit whenever a column changes size: window resize, rotation, divider drag,
+// or the ticker appearing/disappearing.
+let fitFrame = 0;
+const columnObserver = new ResizeObserver(() => {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(fitAll);
+});
+for (const col of document.querySelectorAll(".trains")) columnObserver.observe(col);
 
-    const byColumn = {};
-    const late = [];
-    for (const c of COLUMNS) byColumn[c.id] = [];
-    for (const etd of etds) {
-      for (const est of etd.estimate) {
-        if (est.cancelflag === "1") continue;
-        const minutes = est.minutes === "Leaving" ? 0 : parseInt(est.minutes, 10);
-        if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
-        const col = columnFor(est.platform, etd.destination);
-        if (!col) continue;
-        const lateMin = lateMinutes(est.delay);
-        byColumn[col.id].push({
-          destination: SHORT_NAMES[etd.destination] || etd.destination,
-          showDest: !col.dests.includes(etd.destination),
-          minutes,
-          lateMin,
-          hexcolor: est.hexcolor || "#888"
-        });
-        if (lateMin) late.push({ destination: etd.destination, minutes, lateMin });
-      }
-    }
-    for (const c of COLUMNS) byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
-    lastTrains = byColumn;
-    lastLate = late;
-    await refreshAdvisories();
-    setTicker(tickerMessages());
-    layout();
-
-    document.getElementById("updated").textContent =
-      "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
-  } catch (err) {
-    document.getElementById("updated").textContent = "Update failed — retrying";
-    console.log("Refresh error:", err.message);
-  }
-}
-
-refresh();
-setInterval(refresh, REFRESH_MS);
-
-// ---- Delays, advisories and the ticker -----------------------------------
-const LATE_THRESHOLD_MIN = 3;          // delays of 2 min or less are ignored
-const MAJOR_DELAY_MIN = 5;             // 3-4 min late: light yellow; 5+: red
-const ADVISORY_URL = "https://api.bart.gov/api/bsa.aspx?cmd=bsa&key=MW9S-E7SL-26DU-VV8V&json=y";
-const ADVISORY_REFRESH_MS = 60000;
-const TICKER_SPEED_VMIN_PER_S = 14;   // scrolling speed, in % of the screen's shorter side per second
-
-let lastLate = [];          // late trains from the latest refresh
-let lastAdvisories = [];    // BART service advisory texts
-let lastAdvisoryFetch = 0;
-
-// BART reports each train's delay in seconds. Returns whole minutes late
-// (rounded), or 0 if that's under the threshold.
-function lateMinutes(delaySeconds) {
-  const min = Math.round((parseInt(delaySeconds, 10) || 0) / 60);
-  return min >= LATE_THRESHOLD_MIN ? min : 0;
-}
-
-async function refreshAdvisories() {
-  if (Date.now() - lastAdvisoryFetch < ADVISORY_REFRESH_MS) return;
-  lastAdvisoryFetch = Date.now();
-  try {
-    const res = await fetch(ADVISORY_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const list = [].concat((data.root && data.root.bsa) || []);
-    lastAdvisories = list
-      .map(a => ((a.description && a.description["#cdata-section"]) || "").trim())
-      .filter(text => text && !/^no advisories/i.test(text));
-  } catch (err) {
-    console.log("Advisory error:", err.message);   // keep the previous advisories
-  }
-}
-
-// Worst delays first, then BART's advisories.
-function tickerMessages() {
-  const delays = [...lastLate]
-    .sort((a, b) => b.lateMin - a.lateMin || a.minutes - b.minutes)
-    .map(t => `${t.destination} train ${t.minutes === 0 ? "leaving now" : "in " + t.minutes + " min"} is running ${t.lateMin} min late`);
-  return [...delays, ...lastAdvisories.map(a => "BART: " + a)];
-}
-
+// =============================================================================
+// Ticker
+// =============================================================================
 let tickerAnimation = null;
 
 function setTicker(messages) {
   const ticker = document.getElementById("ticker");
   const textEl = document.getElementById("ticker-text");
-  const text = messages.length ? "\u26A0 " + messages.join("     \u2022     ") : "";
-  if (text === textEl.textContent && !ticker.hidden === !!text) return;   // unchanged: keep scrolling smoothly
+  const text = messages.length ? "⚠ " + messages.join("     •     ") : "";
+  if (text === textEl.textContent && ticker.hidden === !text) return;   // unchanged: keep scrolling smoothly
   textEl.textContent = text;
   ticker.hidden = !text;
   startTickerScroll();
@@ -549,11 +642,22 @@ function startTickerScroll() {
   };
 }
 
-// ---- Draggable divider --------------------------------------------------
-// Drag (or use arrow keys) to change how much room Platform 1 gets.
-// Double-tap resets to the default. The position is remembered on this device.
-const DEFAULT_SPLIT = 0.4;
-const SPLIT_KEY = "kiosk-split";
+// Restart the scroll if the strip changes width (rotation, resize).
+let tickerWidth = 0;
+new ResizeObserver(entries => {
+  const width = Math.round(entries[0].contentRect.width);
+  if (width && width !== tickerWidth) {
+    tickerWidth = width;
+    startTickerScroll();
+  }
+}).observe(document.getElementById("ticker"));
+
+// =============================================================================
+// Draggable divider
+// =============================================================================
+// Drag (or use arrow keys) to change how much room Platform 1 gets. Double-tap
+// resets to the default. The position is remembered on this device. Only the
+// --split value changes; the columns' ResizeObserver takes care of refitting.
 const mainEl = document.querySelector("main");
 const divider = document.getElementById("divider");
 
@@ -563,7 +667,6 @@ function setSplit(value, save) {
   if (save) {
     try { localStorage.setItem(SPLIT_KEY, String(split)); } catch (e) { /* storage unavailable */ }
   }
-  layout();
 }
 
 function savedSplit() {
@@ -588,25 +691,19 @@ function splitAt(clientX, clientY) {
   return pos / size;
 }
 
-let dragFrame = 0;
 divider.addEventListener("pointerdown", e => {
   divider.setPointerCapture(e.pointerId);
   divider.classList.add("dragging");
   e.preventDefault();
 });
 divider.addEventListener("pointermove", e => {
-  if (!divider.hasPointerCapture(e.pointerId)) return;
-  const x = e.clientX, y = e.clientY;
-  cancelAnimationFrame(dragFrame);
-  dragFrame = requestAnimationFrame(() => setSplit(splitAt(x, y), false));
+  if (divider.hasPointerCapture(e.pointerId)) setSplit(splitAt(e.clientX, e.clientY), false);
 });
-function endDrag(e) {
+divider.addEventListener("pointerup", e => {
   if (!divider.classList.contains("dragging")) return;
   divider.classList.remove("dragging");
-  cancelAnimationFrame(dragFrame);
   setSplit(splitAt(e.clientX, e.clientY), true);
-}
-divider.addEventListener("pointerup", endDrag);
+});
 divider.addEventListener("pointercancel", () => divider.classList.remove("dragging"));
 divider.addEventListener("dblclick", () => setSplit(DEFAULT_SPLIT, true));
 divider.addEventListener("keydown", e => {
@@ -617,19 +714,12 @@ divider.addEventListener("keydown", e => {
   setSplit(current + step, true);
 });
 
-let resizeFrame = 0;
-addEventListener("resize", () => {
-  cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(() => { layout(); startTickerScroll(); });
-});
-
-setSplit(savedSplit(), false);
-
-// Reload the page when a new version of it is published.
-// Every few minutes, fetch this page's own file and compare it to the version
-// that was current when the page loaded. Failed checks (network down, server
-// error) are ignored, so the kiosk never reloads into an error page.
-const UPDATE_CHECK_MS = 5 * 60 * 1000;
+// =============================================================================
+// Auto-update: reload when a new version of this page is published
+// =============================================================================
+// Fetch this page's own file and compare it to the version that was current
+// when the page loaded. Failed checks are ignored, so the kiosk never reloads
+// into an error page.
 let loadedVersion = null;
 
 async function checkForUpdate() {
@@ -649,8 +739,29 @@ async function checkForUpdate() {
   }
 }
 
-checkForUpdate();
-setInterval(checkForUpdate, UPDATE_CHECK_MS);
+// =============================================================================
+// Timers: all in one place. A job is skipped if its previous run is still going.
+// =============================================================================
+function every(ms, job) {
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try { await job(); } finally { running = false; }
+  };
+  run();
+  return setInterval(run, ms);
+}
+
+function tickClock() {
+  document.getElementById("clock").textContent = formatTime(new Date(), false);
+}
+
+setSplit(savedSplit(), false);
+every(1000, tickClock);
+every(DEPARTURES_EVERY_MS, updateDepartures);
+every(ADVISORIES_EVERY_MS, updateAdvisories);
+every(UPDATE_CHECK_EVERY_MS, checkForUpdate);
 </script>
 </body>
 </html>
