@@ -44,16 +44,58 @@ const SCENARIOS = {
 const NO_ADVISORIES = { root: { bsa: [{ station: "", description: { "#cdata-section": "No advisories issued." } }] } };
 const ADVISORY = { root: { bsa: [{ station: "", description: { "#cdata-section": "Major delays systemwide due to an earlier equipment problem." } }] } };
 
+// Noon on a Monday, Bay Area time: the train screen is showing.
+const NOON = "2026-11-02T20:00:00Z";
+
+// Open-Meteo forecast response for 72 hours from `startMs`. rainPct(hourIndex, ms) gives each hour's chance.
+function openMeteoFixture(startMs, rainPct = () => 0, rainIn = () => 0) {
+  const hours = [...Array(72).keys()].map(i => startMs + i * 3600000);
+  return {
+    current: { time: startMs / 1000, temperature_2m: 54.3, wind_speed_10m: 7.8, wind_direction_10m: 270 },
+    hourly: {
+      time: hours.map(t => t / 1000),
+      precipitation_probability: hours.map((t, i) => rainPct(i, t)),
+      precipitation: hours.map((t, i) => rainIn(i, t))
+    }
+  };
+}
+
+// NOAA predictions (hilo and 6-minute curve) for a simple tide with a low at `lowMs`.
+function noaaFixture(lowMs, { lowFt = -0.4, highFt = 5.6, fromMs = lowMs - 36 * 3600000 } = {}) {
+  const period = 12.42 * 3600000, mid = (lowFt + highFt) / 2, amp = (highFt - lowFt) / 2;
+  const fmt = t => new Date(t).toISOString().slice(0, 16).replace("T", " ");
+  const curve = [], hilo = [];
+  for (let t = fromMs; t < fromMs + 72 * 3600000; t += 6 * 60000) {
+    curve.push({ t: fmt(t), v: (mid - amp * Math.cos(2 * Math.PI * (t - lowMs) / period)).toFixed(3) });
+  }
+  for (let k = -6; k <= 6; k++) {
+    const t = lowMs + k * period / 2;
+    if (t >= fromMs && t < fromMs + 72 * 3600000) hilo.push({ t: fmt(t), v: String(k % 2 ? highFt : lowFt), type: k % 2 ? "H" : "L" });
+  }
+  return { hilo: { predictions: hilo }, curve: { predictions: curve } };
+}
+
 function json(body, status = 200) {
   return { status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) };
 }
 
 // Opens the board with fake BART responses. `departures` may be a function
 // (called per request) to change the data or fail between refreshes.
-async function openBoard(page, { etd = SCENARIOS.normal, bsa = NO_ADVISORIES, query = "", departures } = {}) {
+// `time`: what the page's clock says (default: noon, trains). Pass null if the
+// test installed its own clock. `weather`/`tides`: responses, or a status code to fail.
+async function openBoard(page, { etd = SCENARIOS.normal, bsa = NO_ADVISORIES, query = "", departures, time = NOON, weather, tides } = {}) {
+  if (time !== null) await page.clock.setFixedTime(new Date(time));
+  const now = time !== null ? Date.parse(time) : Date.parse(NOON);
+  const hourStart = now - (now % 3600000);
+  const wx = weather === undefined ? openMeteoFixture(hourStart) : weather;
+  const td = tides === undefined ? noaaFixture(Date.parse("2026-11-02T15:44:00Z")) : tides;
   await page.route("https://api.bart.gov/api/etd.aspx**", route =>
     route.fulfill(departures ? departures() : json({ root: { station: [{ etd }] } })));
   await page.route("https://api.bart.gov/api/bsa.aspx**", route => route.fulfill(json(bsa)));
+  await page.route("https://api.open-meteo.com/**", route =>
+    route.fulfill(typeof wx === "number" ? json({ error: true }, wx) : json(wx)));
+  await page.route("https://api.tidesandcurrents.noaa.gov/**", route =>
+    route.fulfill(typeof td === "number" ? json({ error: true }, td) : json(route.request().url().includes("interval=hilo") ? td.hilo : td.curve)));
   await page.goto(PAGE_URL + query);
   // The first refresh has finished (successfully or not) once the status changes.
   await page.waitForFunction(() => !document.getElementById("status").textContent.startsWith("Updating"));
@@ -105,4 +147,5 @@ async function columnSummary(page) {
   })));
 }
 
-module.exports = { PAGE_URL, SCENARIOS, NO_ADVISORIES, ADVISORY, json, est, openBoard, layoutProblems, columnSummary, ORANGE, BLUE };
+module.exports = { PAGE_URL, SCENARIOS, NO_ADVISORIES, ADVISORY, NOON, json, est, openBoard, layoutProblems, columnSummary,
+  openMeteoFixture, noaaFixture, ORANGE, BLUE };
