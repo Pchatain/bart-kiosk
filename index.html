@@ -42,8 +42,8 @@
     font-weight: 600;
   }
   main {
-    /* --split: Platform 1's share of the width (0.25 = 25%). Set by dragging the divider. */
-    --split: 0.25;
+    /* --split: Platform 1's share of the width (0.4 = 40%). Set by dragging the divider. */
+    --split: 0.4;
     --div-space: 4vmin;    /* divider width + its margins */
     flex: 1;
     display: flex;
@@ -157,9 +157,11 @@
     white-space: nowrap;
   }
   .mins.leaving { color: #ffd34d; font-size: var(--now, min(12vmin, 7.5vw)); }
-  /* Late trains (2+ min): red outline around the number, plus a "+N" badge
-     beside it, light yellow for 2-4 min late and red for 5+. */
-  .mins.late { box-shadow: 0 0 0 0.045em #ff4d4f; border-radius: 0.14em; padding: 0 0.06em; }
+  /* Late trains (3+ min): an outline around the number plus a "+N" badge beside
+     it, both light yellow for 3-4 min late and red for 5+. */
+  .mins.late { box-shadow: 0 0 0 0.045em var(--late-color); border-radius: 0.14em; padding: 0 0.06em; }
+  .mins.late.minor { --late-color: #ffe08a; }
+  .mins.late.major { --late-color: #ff4d4f; }
   .late-badge {
     align-self: flex-start;
     font-size: calc(var(--num, 10vmin) * 0.26);
@@ -311,8 +313,9 @@ function renderColumn(el, trains) {
 
     const parts = t.showDest ? [dot, div("dest", t.destination), mins] : [dot, mins];
     if (t.lateMin) {
-      mins.classList.add("late");
-      parts.push(div("late-badge " + (t.lateMin >= 5 ? "major" : "minor"), "+" + t.lateMin));
+      const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
+      mins.classList.add("late", severity);
+      parts.push(div("late-badge " + severity, "+" + t.lateMin));
     }
     row.append(...parts);
     return row;
@@ -467,7 +470,8 @@ refresh();
 setInterval(refresh, REFRESH_MS);
 
 // ---- Delays, advisories and the ticker -----------------------------------
-const LATE_THRESHOLD_MIN = 2;          // ignore delays shorter than this
+const LATE_THRESHOLD_MIN = 3;          // delays of 2 min or less are ignored
+const MAJOR_DELAY_MIN = 5;             // 3-4 min late: light yellow; 5+: red
 const ADVISORY_URL = "https://api.bart.gov/api/bsa.aspx?cmd=bsa&key=MW9S-E7SL-26DU-VV8V&json=y";
 const ADVISORY_REFRESH_MS = 60000;
 const TICKER_SPEED_VMIN_PER_S = 14;   // scrolling speed, in % of the screen's shorter side per second
@@ -476,11 +480,11 @@ let lastLate = [];          // late trains from the latest refresh
 let lastAdvisories = [];    // BART service advisory texts
 let lastAdvisoryFetch = 0;
 
-// BART reports each train's delay in seconds. Returns whole minutes late, or 0 if under the threshold.
+// BART reports each train's delay in seconds. Returns whole minutes late
+// (rounded), or 0 if that's under the threshold.
 function lateMinutes(delaySeconds) {
-  const seconds = parseInt(delaySeconds, 10) || 0;
-  if (seconds < LATE_THRESHOLD_MIN * 60) return 0;
-  return Math.round(seconds / 60);
+  const min = Math.round((parseInt(delaySeconds, 10) || 0) / 60);
+  return min >= LATE_THRESHOLD_MIN ? min : 0;
 }
 
 async function refreshAdvisories() {
@@ -548,7 +552,7 @@ function startTickerScroll() {
 // ---- Draggable divider --------------------------------------------------
 // Drag (or use arrow keys) to change how much room Platform 1 gets.
 // Double-tap resets to the default. The position is remembered on this device.
-const DEFAULT_SPLIT = 0.25;
+const DEFAULT_SPLIT = 0.4;
 const SPLIT_KEY = "kiosk-split";
 const mainEl = document.querySelector("main");
 const divider = document.getElementById("divider");
