@@ -89,9 +89,11 @@
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2vw;
     min-height: 0;
   }
+  /* Thin gray line between the two columns in each half. */
+  .col:first-child { padding-right: 1.2vw; }
+  .col + .col { padding-left: 1.2vw; border-left: 2px solid rgba(255,255,255,0.14); }
   .col {
     display: flex;
     flex-direction: column;
@@ -136,8 +138,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Each number sits right next to its dot, in a slot two digits wide and
+     right-aligned, so "9" lines up under the "6" of "16". */
   .mins {
-    margin-left: auto;
+    min-width: 2ch;
     /* Landscape: sized so 4 rows fit per column (17% of height), capped so
        "88" plus the dot fit a column (a quarter of the width). On landscape
        screens vmin is the height, so this is min(17vh, 12.5vw). */
