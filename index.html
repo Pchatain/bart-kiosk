@@ -142,6 +142,7 @@
      right-aligned, so "9" lines up under the "6" of "16". */
   .mins {
     min-width: 2ch;
+    flex-shrink: 0;
     /* Landscape: sized so 4 rows fit per column (17% of height), capped so
        "88" plus the dot fit a column (a quarter of the width). On landscape
        screens vmin is the height, so this is min(17vh, 12.5vw). */
@@ -156,6 +157,36 @@
     white-space: nowrap;
   }
   .mins.leaving { color: #ffd34d; font-size: var(--now, min(12vmin, 7.5vw)); }
+  /* Late trains (2+ min): red outline around the number, plus a "+N" badge
+     beside it, light yellow for 2-4 min late and red for 5+. */
+  .mins.late { box-shadow: 0 0 0 0.045em #ff4d4f; border-radius: 0.14em; padding: 0 0.06em; }
+  .late-badge {
+    align-self: flex-start;
+    font-size: calc(var(--num, 10vmin) * 0.26);
+    font-weight: 800;
+    line-height: 1;
+    padding: 0.18em 0.42em;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .late-badge.minor { background: #ffe08a; color: #3a2a00; }
+  .late-badge.major { background: #ff4d4f; color: #fff; }
+  /* Scrolling message strip above the footer; hidden when there's nothing to say. */
+  #ticker {
+    flex: 0 0 auto;
+    margin: 0 2vw;
+    padding: 0.8vmin 1.5vw;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 4.6vmin;
+    font-weight: 700;
+    color: #ffd34d;
+    background: rgba(255,211,77,0.08);
+    border-top: 2px solid rgba(255,211,77,0.35);
+    border-radius: 1vmin;
+  }
+  #ticker[hidden] { display: none; }
+  #ticker-text { display: inline-block; will-change: transform; }
   .empty, .error {
     font-size: 2.8vmin;
     color: var(--muted);
@@ -193,22 +224,23 @@
     <section class="platform p1" aria-label="Platform 1">
       <div class="cols">
         <div class="col"><div class="col-head"><span class="plat">#1</span><span class="name" data-full="Berryessa" data-short="BERY">Berryessa</span></div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
-        <div class="col"><div class="col-head"><span class="name" data-full="Dublin" data-short="DUB">Dublin</span></div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="plat">#1</span><span class="name" data-full="Dublin" data-short="DUB">Dublin</span></div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
     <div id="divider" role="separator" aria-label="Drag to resize platforms" tabindex="0"></div>
     <section class="platform p2" aria-label="Platform 2">
       <div class="cols">
         <div class="col"><div class="col-head"><span class="plat">#2</span><span class="name" data-full="San Francisco" data-short="SF">San Francisco</span></div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
-        <div class="col"><div class="col-head"><span class="name" data-full="Richmond" data-short="RICH">Richmond</span></div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="plat">#2</span><span class="name" data-full="Richmond" data-short="RICH">Richmond</span></div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
   </main>
+  <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
     <div>Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="updated">Updating&hellip;</span><span id="version">v8</span></div>
+    <div class="right"><span id="updated">Updating&hellip;</span><span id="version">v9</span></div>
   </footer>
 
 <script>
@@ -277,11 +309,12 @@ function renderColumn(el, trains) {
       mins = div("mins", String(t.minutes));
     }
 
-    if (t.showDest) {
-      row.append(dot, div("dest", t.destination), mins);
-    } else {
-      row.append(dot, mins);
+    const parts = t.showDest ? [dot, div("dest", t.destination), mins] : [dot, mins];
+    if (t.lateMin) {
+      mins.classList.add("late");
+      parts.push(div("late-badge " + (t.lateMin >= 5 ? "major" : "minor"), "+" + t.lateMin));
     }
+    row.append(...parts);
     return row;
   }));
 }
@@ -307,7 +340,11 @@ function rowsFit(el, n) {
     const range = document.createRange();
     range.selectNodeContents(mins);
     const text = range.getBoundingClientRect();
+    const minsBox = mins.getBoundingClientRect();
     if (text.right > box.right + 1 || text.left < dot.getBoundingClientRect().right + 1) return false;
+    if (text.right > minsBox.right + 1 || text.left < minsBox.left - 1) return false;   // text spilling out of its own box
+    const badge = row.querySelector(".late-badge");
+    if (badge && badge.getBoundingClientRect().right > box.right + 1) return false;
   }
   return true;
 }
@@ -318,8 +355,9 @@ function fitColumn(el, rowsToFit) {
   const vmin = Math.min(innerWidth, innerHeight) / 100;
   const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;   // dot + gap + slack
   const rowExtra = 1.6 * vmin + 1;                         // row padding + divider line
+  const widthRatio = el.querySelector(".late-badge") ? 2.0 : 1.3;   // room for a "+N" badge
   let num = Math.min((el.clientHeight / rowsToFit - rowExtra) / 0.95,
-                     (el.clientWidth - side) / 1.3);
+                     (el.clientWidth - side) / widthRatio);
   const n = Math.min(rowsToFit, rows.length);
   for (let i = 0; i < 25; i++) {
     setColumnSize(el, num);
@@ -390,6 +428,7 @@ async function refresh() {
     const etds = (data.root.station && data.root.station[0] && data.root.station[0].etd) || [];
 
     const byColumn = {};
+    const late = [];
     for (const c of COLUMNS) byColumn[c.id] = [];
     for (const etd of etds) {
       for (const est of etd.estimate) {
@@ -398,16 +437,22 @@ async function refresh() {
         if (isNaN(minutes) || minutes > MAX_MINUTES) continue;
         const col = columnFor(est.platform, etd.destination);
         if (!col) continue;
+        const lateMin = lateMinutes(est.delay);
         byColumn[col.id].push({
           destination: SHORT_NAMES[etd.destination] || etd.destination,
           showDest: !col.dests.includes(etd.destination),
           minutes,
+          lateMin,
           hexcolor: est.hexcolor || "#888"
         });
+        if (lateMin) late.push({ destination: etd.destination, minutes, lateMin });
       }
     }
     for (const c of COLUMNS) byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
     lastTrains = byColumn;
+    lastLate = late;
+    await refreshAdvisories();
+    setTicker(tickerMessages());
     layout();
 
     document.getElementById("updated").textContent =
@@ -420,6 +465,85 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, REFRESH_MS);
+
+// ---- Delays, advisories and the ticker -----------------------------------
+const LATE_THRESHOLD_MIN = 2;          // ignore delays shorter than this
+const ADVISORY_URL = "https://api.bart.gov/api/bsa.aspx?cmd=bsa&key=MW9S-E7SL-26DU-VV8V&json=y";
+const ADVISORY_REFRESH_MS = 60000;
+const TICKER_SPEED_VMIN_PER_S = 14;   // scrolling speed, in % of the screen's shorter side per second
+
+let lastLate = [];          // late trains from the latest refresh
+let lastAdvisories = [];    // BART service advisory texts
+let lastAdvisoryFetch = 0;
+
+// BART reports each train's delay in seconds. Returns whole minutes late, or 0 if under the threshold.
+function lateMinutes(delaySeconds) {
+  const seconds = parseInt(delaySeconds, 10) || 0;
+  if (seconds < LATE_THRESHOLD_MIN * 60) return 0;
+  return Math.round(seconds / 60);
+}
+
+async function refreshAdvisories() {
+  if (Date.now() - lastAdvisoryFetch < ADVISORY_REFRESH_MS) return;
+  lastAdvisoryFetch = Date.now();
+  try {
+    const res = await fetch(ADVISORY_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const list = [].concat((data.root && data.root.bsa) || []);
+    lastAdvisories = list
+      .map(a => ((a.description && a.description["#cdata-section"]) || "").trim())
+      .filter(text => text && !/^no advisories/i.test(text));
+  } catch (err) {
+    console.log("Advisory error:", err.message);   // keep the previous advisories
+  }
+}
+
+// Worst delays first, then BART's advisories.
+function tickerMessages() {
+  const delays = [...lastLate]
+    .sort((a, b) => b.lateMin - a.lateMin || a.minutes - b.minutes)
+    .map(t => `${t.destination} train ${t.minutes === 0 ? "leaving now" : "in " + t.minutes + " min"} is running ${t.lateMin} min late`);
+  return [...delays, ...lastAdvisories.map(a => "BART: " + a)];
+}
+
+let tickerAnimation = null;
+
+function setTicker(messages) {
+  const ticker = document.getElementById("ticker");
+  const textEl = document.getElementById("ticker-text");
+  const text = messages.length ? "\u26A0 " + messages.join("     \u2022     ") : "";
+  if (text === textEl.textContent && !ticker.hidden === !!text) return;   // unchanged: keep scrolling smoothly
+  textEl.textContent = text;
+  ticker.hidden = !text;
+  startTickerScroll();
+}
+
+// Scroll only if the text is wider than the strip; short messages stay still.
+function startTickerScroll() {
+  const ticker = document.getElementById("ticker");
+  const textEl = document.getElementById("ticker-text");
+  if (tickerAnimation) { tickerAnimation.cancel(); tickerAnimation = null; }
+  if (ticker.hidden) return;
+  const boxWidth = ticker.clientWidth;
+  const textWidth = textEl.scrollWidth;
+  if (textWidth <= boxWidth) return;
+  const speed = TICKER_SPEED_VMIN_PER_S * Math.min(innerWidth, innerHeight) / 100;
+  // First pass starts with the text already visible at the left edge;
+  // after that it loops in from the right edge.
+  const firstPass = textEl.animate(
+    [{ transform: "translateX(0)" }, { transform: `translateX(${-textWidth}px)` }],
+    { duration: textWidth / speed * 1000 }
+  );
+  tickerAnimation = firstPass;
+  firstPass.onfinish = () => {
+    if (tickerAnimation !== firstPass) return;   // restarted in the meantime
+    tickerAnimation = textEl.animate(
+      [{ transform: `translateX(${boxWidth}px)` }, { transform: `translateX(${-textWidth}px)` }],
+      { duration: (boxWidth + textWidth) / speed * 1000, iterations: Infinity }
+    );
+  };
+}
 
 // ---- Draggable divider --------------------------------------------------
 // Drag (or use arrow keys) to change how much room Platform 1 gets.
@@ -492,7 +616,7 @@ divider.addEventListener("keydown", e => {
 let resizeFrame = 0;
 addEventListener("resize", () => {
   cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(layout);
+  resizeFrame = requestAnimationFrame(() => { layout(); startTickerScroll(); });
 });
 
 setSplit(savedSplit(), false);
