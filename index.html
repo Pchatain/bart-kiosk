@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.bart.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
+  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.bart.gov https://api.open-meteo.com https://api.tidesandcurrents.noaa.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Fruitvale BART Departures</title>
 <style>
   :root {
@@ -28,7 +28,7 @@
   }
   header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     padding: 2vmin 3vw 1vmin;
   }
@@ -38,6 +38,23 @@
     letter-spacing: 0.02em;
   }
   header h1 span { color: var(--accent); }
+  .title { display: flex; align-items: center; gap: 1.6vmin; }
+  /* Tap to switch between trains and weather (for 5 minutes). */
+  #screen-toggle {
+    width: 7vmin; height: 7vmin;
+    padding: 1.1vmin;
+    border: 2px solid rgba(255,255,255,0.18);
+    border-radius: 1.4vmin;
+    background: var(--panel);
+    color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #screen-toggle svg { width: 100%; height: 100%; display: block; }
+  #screen-toggle .to-trains, body.show-weather #screen-toggle .to-weather { display: none; }
+  body.show-weather #screen-toggle .to-trains { display: block; }
+  main[hidden], #weather[hidden] { display: none; }
+  body.show-weather #ticker { display: none; }
   #clock {
     font-size: 4.5vmin;
     font-variant-numeric: tabular-nums;
@@ -239,6 +256,65 @@
   #status.problem { color: #ff8a80; }
   #version { margin-left: 1em; opacity: 0.6; }
 
+  /* ---- Weather screen ---- */
+  #weather {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 2vmin;
+    padding: 0 2vw 1vmin;
+  }
+  .wx-card {
+    background: var(--panel);
+    border-radius: 1.5vmin;
+    padding: 1.5vmin 1.5vw;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .wx-tides { grid-row: 1 / span 2; }
+  .wx-label {
+    font-size: 2.8vmin;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 0.6vmin;
+    border-bottom: 2px solid rgba(255,255,255,0.12);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wx-headline { font-size: 4.4vmin; font-weight: 800; margin-top: 1vmin; line-height: 1.15; }
+  .wx-detail { font-size: 2.8vmin; color: var(--muted); margin-top: 0.6vmin; line-height: 1.3; }
+  .wx-detail b { color: var(--text); font-weight: 700; }
+  .wx-big { font-size: 9vmin; font-weight: 800; line-height: 1; margin-top: 1vmin; font-variant-numeric: tabular-nums; }
+  .wx-message { font-size: 3vmin; color: var(--muted); margin-top: 1.5vmin; }
+  .wx-message.problem { color: #ff8a80; }
+  .tide-chart { flex: 1; min-height: 12vmin; margin-top: 1vmin; position: relative; }
+  .tide-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .tide-events { font-size: 2.6vmin; color: var(--muted); margin-top: 0.8vmin; line-height: 1.4; }
+  .tide-events b { color: var(--text); }
+  .tide-events span { white-space: nowrap; }
+  .rain-bars {
+    flex: 1;
+    min-height: 6vmin;
+    display: flex;
+    align-items: stretch;
+    gap: 0.25vw;
+    margin-top: 1.2vmin;
+  }
+  .rain-bar { flex: 1; display: flex; align-items: flex-end; background: rgba(77,163,255,0.08); border-radius: 0.4vmin 0.4vmin 0 0; }
+  .rain-bar i { display: block; width: 100%; border-radius: 0.4vmin 0.4vmin 0 0; background: rgba(77,163,255,0.35); }
+  .rain-bar.possible i { background: rgba(77,163,255,0.7); }
+  .rain-bar.likely i { background: #4da3ff; }
+  .rain-hours { display: flex; gap: 0.25vw; font-size: 2vmin; color: var(--muted); margin-top: 0.4vmin; }
+  .rain-hours span { flex: 1; white-space: nowrap; overflow: visible; }
+
   /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
     main { flex-direction: column; }
@@ -246,12 +322,25 @@
     #divider { margin: 1.2vmin 0; cursor: row-resize; }
     #divider::before { left: 0; right: 0; top: -2.5vmin; bottom: -2.5vmin; }
     #divider::after { width: 9vmin; height: 0.5vmin; }
+    #weather { grid-template-columns: 1fr; grid-template-rows: 1.4fr auto auto; }
+    .wx-tides { grid-row: auto; }
   }
 </style>
 </head>
 <body>
   <header>
-    <h1>Fruitvale <span>BART</span></h1>
+    <div class="title">
+      <button id="screen-toggle" type="button" aria-label="Show weather">
+        <svg class="to-weather" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="9" cy="9" r="3.5"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"/>
+          <path d="M11 20.5h8a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 11 20.5z" fill="var(--panel)"/>
+        </svg>
+        <svg class="to-trains" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5" y="2.5" width="14" height="15" rx="3"/><path d="M5 10h14M9 21.5l-2-4M15 21.5l2-4"/><circle cx="9" cy="14" r="0.8" fill="currentColor"/><circle cx="15" cy="14" r="0.8" fill="currentColor"/>
+        </svg>
+      </button>
+      <h1>Fruitvale <span id="title-word">BART</span></h1>
+    </div>
     <div id="clock">--:--</div>
   </header>
   <main>
@@ -269,12 +358,30 @@
       </div>
     </section>
   </main>
+  <section id="weather" hidden aria-label="Weather and tides">
+    <div class="wx-card wx-tides">
+      <div class="wx-label" id="tide-label">Tides during practice</div>
+      <div id="tide-body"><div class="wx-message">Loading tides&hellip;</div></div>
+      <div class="tide-chart" id="tide-chart"></div>
+      <div class="tide-events" id="tide-events"></div>
+    </div>
+    <div class="wx-card wx-sun">
+      <div class="wx-label">Sunrise</div>
+      <div id="sun-body"></div>
+    </div>
+    <div class="wx-card wx-rain">
+      <div class="wx-label">Rain &middot; next 24 hours</div>
+      <div id="rain-body"><div class="wx-message">Loading forecast&hellip;</div></div>
+      <div class="rain-bars" id="rain-bars"></div>
+      <div class="rain-hours" id="rain-hours"></div>
+    </div>
+  </section>
   <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
-    <div>Departures within the next 60 minutes</div>
+    <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v9.1</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10</span></div>
   </footer>
 
 <script>
@@ -307,6 +414,18 @@ const MAX_ROWS = 4;
 const WIDTH_RATIO = 1.3;                   // row width in number-font-sizes: fits "88"
 const WIDTH_RATIO_WITH_BADGE = 2.0;        // ...plus a "+N" late badge
 
+// Weather screen
+const LOCATION = { lat: 37.78, lon: -122.24 };               // Oakland Estuary by Fruitvale
+const WEATHER_HOURS = { from: 5 * 60, until: 7 * 60 };       // show weather 5:00-7:00 AM, every day
+const PRACTICE_HOURS = { from: 6 * 60 + 30, until: 8 * 60 + 30 };
+const TIDE_CHART_HOURS = { from: 4 * 60, until: 11 * 60 };   // time range drawn on the tide chart
+const MANUAL_SWITCH_MS = 5 * 60 * 1000;                      // a tap on the icon lasts this long
+const WEATHER_EVERY_MS = 15 * 60 * 1000;
+const TIDES_EVERY_MS = 3 * 60 * 60 * 1000;
+const RAIN_POSSIBLE_PCT = 30;                                 // an hour at or above this counts as rain
+const RAIN_LIKELY_PCT = 60;
+const WEATHER_STALE_MS = 60 * 60 * 1000;                      // say "as of" when older than this
+
 const DEFAULT_SPLIT = 0.4;                 // Platform 1's default share of the width
 const SPLIT_KEY = "kiosk-split";
 
@@ -333,6 +452,8 @@ const PLATFORMS = ["1", "2"];
 // Container units (cqw/cqh) let CSS do the sizing. Older browsers get the same
 // formula computed in the script. "?nocq" in the address forces that path, for testing.
 const USE_CONTAINER_UNITS = CSS.supports("height: 1cqh") && !/[?&]nocq\b/.test(location.search);
+// "?screen=weather" or "?screen=trains" in the address pins a screen (for testing).
+const PINNED_SCREEN = (location.search.match(/[?&]screen=(weather|trains)\b/) || [])[1] || null;
 
 // =============================================================================
 // State: everything the screen shows comes from here
@@ -340,8 +461,43 @@ const USE_CONTAINER_UNITS = CSS.supports("height: 1cqh") && !/[?&]nocq\b/.test(l
 const state = {
   departures: null,    // { byColumn: {colId: [train]}, fetchedAt } from the last successful refresh
   failures: 0,         // failed departure refreshes in a row
-  advisories: []       // BART service advisory texts
+  advisories: [],      // BART service advisory texts
+  weather: null,       // { current, hourly, fetchedAt } from the weather provider
+  weatherFailed: false,
+  tides: null,         // { events, curve, fetchedAt } from the tide provider
+  tidesFailed: false,
+  manual: null,        // { screen, until } after a tap on the icon
+  shownScreen: null
 };
+
+// =============================================================================
+// Time helpers: everything is shown in TIME_ZONE (Bay Area time)
+// =============================================================================
+const zoneFormat = new Intl.DateTimeFormat("en-US", {
+  timeZone: TIME_ZONE, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23"
+});
+
+// { year, month, day, hour, minute } of a moment, in Bay Area time.
+function zoneParts(ms) {
+  const p = {};
+  for (const { type, value } of zoneFormat.formatToParts(new Date(ms))) p[type] = parseInt(value, 10);
+  return { year: p.year, month: p.month, day: p.day, hour: p.hour % 24, minute: p.minute };
+}
+
+// The moment (ms) that's the given Bay Area date and time.
+function zonedTime(year, month, day, hour = 0, minute = 0) {
+  const wanted = Date.UTC(year, month - 1, day, hour, minute);
+  let t = wanted;
+  for (let i = 0; i < 3; i++) {
+    const p = zoneParts(t);
+    t += wanted - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  }
+  return t;
+}
+
+const minutesOfDay = ms => { const p = zoneParts(ms); return p.hour * 60 + p.minute; };
+const sameDay = (a, b) => { const p = zoneParts(a), q = zoneParts(b); return p.year === q.year && p.month === q.month && p.day === q.day; };
+const atMinutes = (day, minutes) => zonedTime(day.year, day.month, day.day, Math.floor(minutes / 60), minutes % 60);
 
 // =============================================================================
 // Data: fetch from BART and turn it into plain objects (no DOM here)
@@ -407,6 +563,72 @@ async function fetchAdvisories() {
 }
 
 // =============================================================================
+// Weather provider. To switch weather services, replace this object: the
+// screen only uses what fetchForecast() returns.
+// =============================================================================
+const weatherProvider = {
+  name: "Open-Meteo",
+  // Returns { current: { tempF, windMph, windFromDeg }, hourly: [{ time, rainPct, rainIn }] }, times in ms.
+  async fetchForecast() {
+    const d = await fetchJson("https://api.open-meteo.com/v1/forecast" +
+      `?latitude=${LOCATION.lat}&longitude=${LOCATION.lon}` +
+      "&current=temperature_2m,wind_speed_10m,wind_direction_10m" +
+      "&hourly=precipitation_probability,precipitation" +
+      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
+      "&timeformat=unixtime&timezone=GMT&forecast_days=3");
+    return {
+      current: { tempF: d.current.temperature_2m, windMph: d.current.wind_speed_10m, windFromDeg: d.current.wind_direction_10m },
+      hourly: d.hourly.time.map((t, i) => ({
+        time: t * 1000,
+        rainPct: d.hourly.precipitation_probability[i] || 0,
+        rainIn: d.hourly.precipitation[i] || 0
+      }))
+    };
+  }
+};
+
+// =============================================================================
+// Tide provider: NOAA predictions for Alameda, the nearest station to the estuary.
+// =============================================================================
+const tideProvider = {
+  name: "NOAA, Alameda",
+  station: "9414750",
+  // Returns { events: [{ time, type: "high" | "low", ft }], curve: [{ time, ft }] } covering about 3 days.
+  async fetchTides() {
+    const p = zoneParts(Date.now());
+    const begin = `${p.year}${String(p.month).padStart(2, "0")}${String(p.day).padStart(2, "0")}`;
+    const url = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions" +
+      `&station=${this.station}&begin_date=${begin}&range=72&datum=MLLW&units=english` +
+      "&time_zone=gmt&format=json&application=fruitvale_kiosk";
+    const [hilo, curve] = await Promise.all([fetchJson(url + "&interval=hilo"), fetchJson(url + "&interval=6")]);
+    const time = t => Date.parse(t.replace(" ", "T") + ":00Z");
+    return {
+      events: hilo.predictions.map(x => ({ time: time(x.t), type: x.type === "H" ? "high" : "low", ft: parseFloat(x.v) })),
+      curve: curve.predictions.map(x => ({ time: time(x.t), ft: parseFloat(x.v) }))
+    };
+  }
+};
+
+// Sunrise, sunset and first light (civil dawn: sun 6 degrees below the horizon),
+// computed here with the standard sunrise equation. Accurate to about a minute.
+function sunTimes(day) {
+  const rad = Math.PI / 180, { lat, lon } = LOCATION;
+  const jd = zonedTime(day.year, day.month, day.day, 12) / 86400000 + 2440587.5;
+  const jStar = Math.round(jd - 2451545.0 + lon / 360) - lon / 360;
+  const M = (357.5291 + 0.98560028 * jStar) % 360;
+  const C = 1.9148 * Math.sin(M * rad) + 0.02 * Math.sin(2 * M * rad) + 0.0003 * Math.sin(3 * M * rad);
+  const lambda = (M + C + 180 + 102.9372) % 360;
+  const transit = 2451545.0 + jStar + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * lambda * rad);
+  const sinDec = Math.sin(lambda * rad) * Math.sin(23.4397 * rad);
+  const cosDec = Math.cos(Math.asin(sinDec));
+  const hourAngle = altitude =>
+    Math.acos((Math.sin(altitude * rad) - Math.sin(lat * rad) * sinDec) / (Math.cos(lat * rad) * cosDec)) / rad;
+  const toMs = j => (j - 2440587.5) * 86400000;
+  const rise = hourAngle(-0.833), civil = hourAngle(-6);
+  return { firstLight: toMs(transit - civil / 360), sunrise: toMs(transit - rise / 360), sunset: toMs(transit + rise / 360) };
+}
+
+// =============================================================================
 // Updates: fetch, store in state, redraw
 // =============================================================================
 async function updateDepartures() {
@@ -417,6 +639,28 @@ async function updateDepartures() {
   } catch (err) {
     state.failures++;
     console.log("Departures error:", err.message);
+  }
+  render();
+}
+
+async function updateWeather() {
+  try {
+    state.weather = { ...(await weatherProvider.fetchForecast()), fetchedAt: Date.now() };
+    state.weatherFailed = false;
+  } catch (err) {
+    state.weatherFailed = true;
+    console.log("Weather error:", err.message);   // keep the previous forecast
+  }
+  render();
+}
+
+async function updateTides() {
+  try {
+    state.tides = { ...(await tideProvider.fetchTides()), fetchedAt: Date.now() };
+    state.tidesFailed = false;
+  } catch (err) {
+    state.tidesFailed = true;
+    console.log("Tides error:", err.message);
   }
   render();
 }
@@ -501,6 +745,40 @@ function tickerMessages(trains) {
   return [...delays, ...state.advisories.map(a => "BART: " + a)];
 }
 
+// =============================================================================
+// Which screen: weather 5-7 AM, trains otherwise; a tap switches for 5 minutes
+// =============================================================================
+function scheduledScreen(now) {
+  const m = minutesOfDay(now);
+  return m >= WEATHER_HOURS.from && m < WEATHER_HOURS.until ? "weather" : "trains";
+}
+
+function activeScreen(now = Date.now()) {
+  if (PINNED_SCREEN) return PINNED_SCREEN;
+  if (state.manual && now < state.manual.until) return state.manual.screen;
+  return scheduledScreen(now);
+}
+
+function toggleScreen() {
+  const now = Date.now();
+  const next = activeScreen(now) === "weather" ? "trains" : "weather";
+  // Switching back to what the schedule says ends the manual switch.
+  state.manual = next === scheduledScreen(now) ? null : { screen: next, until: now + MANUAL_SWITCH_MS };
+  render();
+}
+
+function renderScreenChrome(screen) {
+  const weather = screen === "weather";
+  document.body.classList.toggle("show-weather", weather);
+  document.querySelector("main").hidden = weather;
+  document.getElementById("weather").hidden = !weather;
+  document.getElementById("title-word").textContent = weather ? "Weather" : "BART";
+  document.getElementById("screen-toggle").setAttribute("aria-label", weather ? "Show trains" : "Show weather");
+  document.getElementById("footer-note").textContent = weather
+    ? `Weather: ${weatherProvider.name} \u00b7 Tides: ${tideProvider.name}`
+    : "Departures within the next 60 minutes";
+}
+
 function renderStatus() {
   const status = document.getElementById("status");
   const stale = state.failures >= STALE_AFTER_FAILURES && state.departures;
@@ -517,13 +795,259 @@ function renderStatus() {
   }
 }
 
+function renderWeatherStatus() {
+  const status = document.getElementById("status");
+  const failed = state.weatherFailed || state.tidesFailed;
+  status.classList.toggle("problem", failed);
+  status.textContent = failed ? "Weather update failed \u2014 retrying"
+    : state.weather ? "Weather updated " + formatTime(new Date(state.weather.fetchedAt), false)
+    : "Updating\u2026";
+}
+
 function render() {
+  const screen = activeScreen();
+  state.shownScreen = screen;
+  renderScreenChrome(screen);
   const trains = currentTrains();
   if (trains) renderBoard(trains);
   setTicker(tickerMessages(trains));
   renderStatus();
-  fitAll();
+  if (screen === "weather") {
+    renderWeatherStatus();
+    renderWeather(Date.now());
+  } else {
+    fitAll();
+  }
 }
+
+// =============================================================================
+// Weather screen
+// =============================================================================
+const shortTime = ms => formatTime(new Date(ms), false);
+// "1 PM" for whole hours, "1:30 PM" otherwise.
+const hourTime = ms => zoneParts(ms).minute ? shortTime(ms)
+  : new Date(ms).toLocaleTimeString([], { hour: "numeric", timeZone: TIME_ZONE });
+const feet = v => (v < 0 ? "\u2212" : "") + Math.abs(v).toFixed(1) + " ft";
+
+function el(tag, className, text) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+// The date of the next practice: today until practice ends, then tomorrow.
+function practiceDay(now) {
+  return minutesOfDay(now) < PRACTICE_HOURS.until ? zoneParts(now) : zoneParts(now + 24 * 3600 * 1000);
+}
+
+function tideAt(curve, t) {
+  for (let i = 1; i < curve.length; i++) {
+    if (curve[i].time >= t) {
+      const a = curve[i - 1], b = curve[i];
+      return a.ft + (b.ft - a.ft) * (t - a.time) / (b.time - a.time);
+    }
+  }
+  return null;
+}
+
+// What the tide does during practice, in words.
+function tideSummary(tides, start, end) {
+  const turn = tides.events.find(e => e.time >= start && e.time <= end);
+  const h1 = tideAt(tides.curve, start), h2 = tideAt(tides.curve, end);
+  const headline = turn
+    ? (turn.type === "high" ? `High tide at ${shortTime(turn.time)}: rising, then falling`
+                            : `Low tide at ${shortTime(turn.time)}: falling, then rising`)
+    : (h2 > h1 ? "Rising all practice" : "Falling all practice");
+  const detail = h1 === null || h2 === null ? ""
+    : `${shortTime(start)} <b>${feet(h1)}</b> \u2192 ${shortTime(end)} <b>${feet(h2)}</b>`;
+  return { headline, detail };
+}
+
+// Hours of rain in the next 24 hours, in words.
+function rainSummary(hourly, now) {
+  const start = now - (now % 3600000);
+  const hours = hourly.filter(h => h.time >= start && h.time < start + 24 * 3600000);
+  const max = Math.max(0, ...hours.map(h => h.rainPct));
+  const windows = [];
+  for (const h of hours) {
+    const last = windows[windows.length - 1];
+    if (h.rainPct < RAIN_POSSIBLE_PCT) continue;
+    if (last && h.time - last[last.length - 1].time <= 3600000) last.push(h); else windows.push([h]);
+  }
+  const when = t => {
+    const p = zoneParts(t);
+    if (!sameDay(t, now)) return p.hour < 6 ? "overnight " : "tomorrow ";
+    return p.hour >= 18 && minutesOfDay(now) < 18 * 60 ? "tonight " : "";
+  };
+  const range = w => {
+    const from = w[0].time, to = w[w.length - 1].time + 3600000;
+    return (from <= start ? "now" : when(from) + hourTime(from)) + " \u2013 " + hourTime(to);
+  };
+  if (!windows.length) {
+    return { hours, headline: "No rain expected", detail: `Chance stays at or below <b>${max}%</b> all day and tonight` };
+  }
+  const first = windows[0];
+  const peak = Math.max(...first.map(h => h.rainPct));
+  const total = hours.reduce((sum, h) => sum + h.rainIn, 0);
+  const detail = [`Up to <b>${peak}%</b> chance`];
+  if (total >= 0.01) detail.push(`about <b>${total.toFixed(2)} in</b> total`);
+  if (windows.length > 1) detail.push(`again ${range(windows[1])}`);
+  return { hours, headline: `Rain ${peak >= RAIN_LIKELY_PCT ? "likely" : "possible"} ${range(first)}`, detail: detail.join(" \u00b7 ") };
+}
+
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+function setHtml(elem, html) {
+  // Only our own strings with <b> tags go through here; all data values are numbers or times.
+  elem.innerHTML = html;
+}
+
+function messageFor(failed, what) {
+  return el("div", "wx-message" + (failed ? " problem" : ""), failed ? `${what} unavailable \u2014 retrying` : `Loading ${what.toLowerCase()}\u2026`);
+}
+
+function asOf(data, now) {
+  return data && now - data.fetchedAt > WEATHER_STALE_MS ? ` (as of ${shortTime(data.fetchedAt)})` : "";
+}
+
+function renderWeather(now) {
+  const day = practiceDay(now);
+  const start = atMinutes(day, PRACTICE_HOURS.from), end = atMinutes(day, PRACTICE_HOURS.until);
+
+  // Tides
+  document.getElementById("tide-label").textContent =
+    `Tides during practice \u00b7 ${sameDay(start, now) ? "today" : "tomorrow"} ${shortTime(start)}\u2013${shortTime(end)}`;
+  const tideBody = document.getElementById("tide-body");
+  const tideEvents = document.getElementById("tide-events");
+  if (state.tides && state.tides.curve.length) {
+    const { headline, detail } = tideSummary(state.tides, start, end);
+    const d = el("div", "wx-detail");
+    setHtml(d, detail + asOf(state.tides, now));
+    tideBody.replaceChildren(el("div", "wx-headline", headline), d);
+    const upcoming = state.tides.events.filter(e => e.time >= now).slice(0, 4);
+    setHtml(tideEvents, "Next: " + upcoming.map(e =>
+      `<span>${e.type === "high" ? "High" : "Low"} <b>${shortTime(e.time)}</b> ${feet(e.ft)}</span>`).join(" \u00b7 "));
+  } else {
+    tideBody.replaceChildren(messageFor(state.tidesFailed, "Tides"));
+    tideEvents.textContent = "";
+  }
+  drawTideChart(day, now);
+
+  // Sun
+  const sun = sunTimes(day);
+  const sunBody = document.getElementById("sun-body");
+  const sunDetail = el("div", "wx-detail");
+  setHtml(sunDetail, `First light <b>${shortTime(sun.firstLight)}</b> \u00b7 Sunset <b>${shortTime(sun.sunset)}</b>`);
+  const parts = [el("div", "wx-big", shortTime(sun.sunrise)), sunDetail];
+  if (state.weather) {
+    const c = state.weather.current;
+    const nowLine = el("div", "wx-detail");
+    setHtml(nowLine, `Now <b>${Math.round(c.tempF)}\u00b0F</b> \u00b7 Wind <b>${Math.round(c.windMph)} mph</b> from ${COMPASS[Math.round(c.windFromDeg / 45) % 8]}`);
+    parts.push(nowLine);
+  }
+  sunBody.replaceChildren(...parts);
+
+  // Rain
+  const rainBody = document.getElementById("rain-body");
+  const bars = document.getElementById("rain-bars");
+  const labels = document.getElementById("rain-hours");
+  if (state.weather) {
+    const { hours, headline, detail } = rainSummary(state.weather.hourly, now);
+    const d = el("div", "wx-detail");
+    setHtml(d, detail + asOf(state.weather, now));
+    rainBody.replaceChildren(el("div", "wx-headline", headline), d);
+    bars.replaceChildren(...hours.map(h => {
+      const bar = el("div", "rain-bar" + (h.rainPct >= RAIN_LIKELY_PCT ? " likely" : h.rainPct >= RAIN_POSSIBLE_PCT ? " possible" : ""));
+      const fill = el("i");
+      fill.style.height = Math.max(h.rainPct, 2) + "%";
+      bar.append(fill);
+      return bar;
+    }));
+    labels.replaceChildren(...hours.map((h, i) => {
+      const p = zoneParts(h.time);
+      return el("span", "", i % 6 === 0 ? (p.hour % 12 || 12) + (p.hour < 12 ? "a" : "p") : "");
+    }));
+  } else {
+    rainBody.replaceChildren(messageFor(state.weatherFailed, "Forecast"));
+    bars.replaceChildren();
+    labels.replaceChildren();
+  }
+}
+
+// Tide height from 4 to 11 AM on the practice day, with practice shaded.
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs, text) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function drawTideChart(day, now) {
+  const host = document.getElementById("tide-chart");
+  const W = host.clientWidth, H = host.clientHeight;
+  if (!W || !H || !state.tides) { host.replaceChildren(); return; }
+  const t0 = atMinutes(day, TIDE_CHART_HOURS.from), t1 = atMinutes(day, TIDE_CHART_HOURS.until);
+  const points = state.tides.curve.filter(p => p.time >= t0 && p.time <= t1);
+  if (points.length < 2) { host.replaceChildren(); return; }
+  const font = Math.min(innerWidth, innerHeight) * 0.024;
+  // Room above for labels on highs, below for labels on lows and the hour labels.
+  const pad = { l: font * 3.2, r: font * 0.5, t: font * 2.4, b: font * 3.6 };
+  const lo = Math.min(...points.map(p => p.ft)) - 0.4, hi = Math.max(...points.map(p => p.ft)) + 0.4;
+  const x = t => pad.l + (t - t0) / (t1 - t0) * (W - pad.l - pad.r);
+  const y = v => pad.t + (hi - v) / (hi - lo) * (H - pad.t - pad.b);
+  const muted = "#8da2c0", accent = "#4da3ff";
+  const out = svg("svg", { viewBox: `0 0 ${W} ${H}`, "font-size": font, "font-family": "inherit" });
+
+  // Practice window
+  const ps = atMinutes(day, PRACTICE_HOURS.from), pe = atMinutes(day, PRACTICE_HOURS.until);
+  out.append(svg("rect", { x: x(ps), y: pad.t, width: x(pe) - x(ps), height: H - pad.t - pad.b, fill: "rgba(77,163,255,0.14)", rx: font * 0.3 }));
+  // Label at the bottom of the band, or the top if a low tide's label is down there.
+  const lowInPractice = state.tides.events.some(e => e.type === "low" && e.time >= ps && e.time <= pe);
+  out.append(svg("text", { x: (x(ps) + x(pe)) / 2, y: lowInPractice ? pad.t + font * 1.2 : H - pad.b - font * 0.5,
+    fill: accent, "text-anchor": "middle", "font-weight": 700 }, "Practice"));
+
+  // Height gridlines (whole feet)
+  const step = hi - lo > 6 ? 2 : 1;
+  for (let v = Math.ceil(lo); v <= Math.floor(hi); v += step) {
+    out.append(svg("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), stroke: "rgba(255,255,255,0.08)" }));
+    out.append(svg("text", { x: pad.l - font * 0.4, y: y(v) + font * 0.35, fill: muted, "text-anchor": "end" }, (v < 0 ? "\u2212" : "") + Math.abs(v) + " ft"));
+  }
+
+  // Hour labels
+  // Hour labels, leaving out the two ends so nothing crowds the edges.
+  for (let m = TIDE_CHART_HOURS.from + 60; m < TIDE_CHART_HOURS.until; m += 60) {
+    const h = m / 60;
+    out.append(svg("text", { x: x(atMinutes(day, m)), y: H - font * 0.4, fill: muted, "text-anchor": "middle" }, (h % 12 || 12) + (h < 12 ? " AM" : " PM")));
+  }
+
+  // Curve and area under it
+  const line = points.map((p, i) => (i ? "L" : "M") + x(p.time).toFixed(1) + " " + y(p.ft).toFixed(1)).join(" ");
+  const base = H - pad.b;
+  out.append(svg("path", { d: `${line} L${x(points[points.length - 1].time).toFixed(1)} ${base} L${x(points[0].time).toFixed(1)} ${base} Z`, fill: "rgba(77,163,255,0.10)" }));
+  out.append(svg("path", { d: line, fill: "none", stroke: accent, "stroke-width": font * 0.25, "stroke-linejoin": "round" }));
+
+  // Highs and lows in range
+  for (const e of state.tides.events.filter(e => e.time >= t0 && e.time <= t1)) {
+    const ex = x(e.time), ey = y(e.ft), above = e.type === "high";
+    out.append(svg("circle", { cx: ex, cy: ey, r: font * 0.35, fill: "#f2f6ff" }));
+    const anchor = ex < W * 0.2 ? "start" : ex > W * 0.8 ? "end" : "middle";
+    out.append(svg("text", { x: ex, y: above ? ey - font * 0.8 : ey + font * 1.6, fill: "#f2f6ff", "text-anchor": anchor, "font-weight": 700 },
+      `${above ? "High" : "Low"} ${shortTime(e.time)} \u00b7 ${feet(e.ft)}`));
+  }
+
+  // Now
+  if (now >= t0 && now <= t1) {
+    out.append(svg("line", { x1: x(now), x2: x(now), y1: pad.t, y2: base, stroke: "#ffd34d", "stroke-width": font * 0.12, "stroke-dasharray": `${font * 0.4} ${font * 0.3}` }));
+    out.append(svg("text", { x: x(now) + font * 0.3, y: base - font * 0.4, fill: "#ffd34d", "font-weight": 700 }, "now"));
+  }
+  host.replaceChildren(out);
+}
+
+// Redraw the chart when its box changes size.
+new ResizeObserver(() => { if (state.shownScreen === "weather") drawTideChart(practiceDay(Date.now()), Date.now()); })
+  .observe(document.getElementById("tide-chart"));
 
 // =============================================================================
 // Fitting: CSS sizes the numbers; this only corrects what CSS can't know
@@ -755,12 +1279,17 @@ function every(ms, job) {
 
 function tickClock() {
   document.getElementById("clock").textContent = formatTime(new Date(), false);
+  if (activeScreen() !== state.shownScreen) render();   // schedule or a manual switch changed the screen
 }
+
+document.getElementById("screen-toggle").addEventListener("click", toggleScreen);
 
 setSplit(savedSplit(), false);
 every(1000, tickClock);
 every(DEPARTURES_EVERY_MS, updateDepartures);
 every(ADVISORIES_EVERY_MS, updateAdvisories);
+every(WEATHER_EVERY_MS, updateWeather);
+every(TIDES_EVERY_MS, updateTides);
 every(UPDATE_CHECK_EVERY_MS, checkForUpdate);
 </script>
 </body>

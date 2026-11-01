@@ -93,9 +93,10 @@ test("ticker: hidden with nothing to report, shows advisories, scrolls when long
 
 test("when BART stops responding: minutes count down, then the board fades with the data time", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.clock.install({ time: new Date("2026-11-01T14:00:00Z") });
+  await page.clock.install({ time: new Date("2026-11-02T20:00:00Z") });   // noon, train screen
   let fail = false;
   await openBoard(page, {
+    time: null,
     departures: () => fail ? json({ error: "down" }, 500) : json({ root: { station: [{ etd: SCENARIOS.normal }] } })
   });
   expect((await columnSummary(page))["col-rich"].text[0]).toBe("12");
