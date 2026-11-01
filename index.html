@@ -59,13 +59,11 @@
     overflow: hidden;
   }
   .platform h2 {
-    font-size: 3.6vh;
+    font-size: 3vh;
     color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    border-bottom: 2px solid rgba(255,255,255,0.12);
-    padding-bottom: 1vh;
-    margin-bottom: 1vh;
+    margin-bottom: 0.6vh;
   }
   .cols {
     flex: 1;
@@ -74,7 +72,6 @@
     gap: 2vw;
     min-height: 0;
   }
-  .cols.wide-left { grid-template-columns: 1.45fr 1fr; }
   .col {
     display: flex;
     flex-direction: column;
@@ -97,14 +94,14 @@
   .train {
     display: flex;
     align-items: center;
-    gap: 1vw;
-    padding: 1.2vh 0;
+    gap: 0.8vw;
+    padding: 0.8vh 0;
     border-bottom: 1px solid rgba(255,255,255,0.08);
   }
   .train:last-child { border-bottom: none; }
   .line-dot {
-    width: 3.4vh;
-    height: 3.4vh;
+    width: 3.6vh;
+    height: 3.6vh;
     border-radius: 50%;
     flex-shrink: 0;
     border: 2px solid rgba(255,255,255,0.35);
@@ -120,20 +117,16 @@
   }
   .mins {
     margin-left: auto;
-    font-size: 9vh;
-    line-height: 1;
+    /* As big as fits: "88" plus the dot must fit in a quarter of the screen width. */
+    font-size: min(20vh, 12.5vw);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
   }
-  .mins .unit {
-    font-size: 3.6vh;
-    font-weight: 500;
-    color: var(--muted);
-    margin-left: 0.4vw;
-  }
-  .mins.leaving { color: #ffd34d; }
+  .mins.leaving { color: #ffd34d; font-size: min(12vh, 7.5vw); }
   .empty, .error {
     font-size: 2.8vh;
     color: var(--muted);
@@ -168,14 +161,14 @@
     </section>
     <section class="platform">
       <h2>Platform 2</h2>
-      <div class="cols wide-left">
+      <div class="cols">
         <div class="col"><div class="col-head">San Francisco</div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
         <div class="col"><div class="col-head">Richmond</div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
   </main>
   <footer>
-    <div>Departures within the next 30 minutes</div>
+    <div>Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <div id="updated">Updating&hellip;</div>
   </footer>
@@ -183,7 +176,7 @@
 <script>
 // BART's published public demo key. Anything in client-side JS is public; don't put a private key here.
 const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
-const MAX_MINUTES = 30;
+const MAX_MINUTES = 60;
 const REFRESH_MS = 30000;
 
 // Short codes for destinations, keyed by the name the BART API returns.
@@ -193,20 +186,17 @@ const SHORT_NAMES = {
   "Berryessa/North San Jose": "BERY",
   "Dublin/Pleasanton": "DUB",
   "Daly City": "DALY",
-  "Richmond": "RICH",
-  "SF Airport": "SFIA",
-  "SFO/Millbrae": "SFIA",
-  "Millbrae": "MLBR"
+  "Richmond": "RICH"
 };
 
 // Which column each train goes in. A train goes in the first column on its
 // platform that lists its destination; anything unlisted goes in that
-// platform's fallback column. Rows show the destination name only when the
-// column holds more than one destination (or the train isn't one it lists).
+// platform's fallback column. Rows show only the line-color dot and minutes;
+// the destination name appears only for a train the column doesn't list.
 const COLUMNS = [
   { id: "col-bery", platform: "1", dests: ["Berryessa", "Berryessa/North San Jose"], fallback: true },
   { id: "col-dub",  platform: "1", dests: ["Dublin/Pleasanton"] },
-  { id: "col-sf",   platform: "2", dests: [], fallback: true, showDest: true },
+  { id: "col-sf",   platform: "2", dests: ["Daly City", "SF Airport"], fallback: true },
   { id: "col-rich", platform: "2", dests: ["Richmond"] }
 ];
 
@@ -247,10 +237,6 @@ function renderColumn(el, trains) {
       mins = div("mins leaving", "Now");
     } else {
       mins = div("mins", String(t.minutes));
-      const unit = document.createElement("span");
-      unit.className = "unit";
-      unit.textContent = "min";
-      mins.appendChild(unit);
     }
 
     if (t.showDest) {
@@ -285,7 +271,7 @@ async function refresh() {
         if (!col) continue;
         byColumn[col.id].push({
           destination: SHORT_NAMES[etd.destination] || etd.destination,
-          showDest: col.showDest || !col.dests.includes(etd.destination),
+          showDest: !col.dests.includes(etd.destination),
           minutes,
           hexcolor: est.hexcolor || "#888"
         });
