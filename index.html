@@ -285,12 +285,15 @@ function renderColumn(el, trains) {
 }
 
 // ---- Sizing -------------------------------------------------------------
-// Each column gets the largest numbers that fit ROWS_TO_FIT rows in its
+// Each column gets the largest numbers that fit 3 or 4 rows (see below) in its
 // height and "88" (plus the dot) in its width. The columns can be different
 // widths (the divider is draggable), so this is measured per column. After
 // sizing, it checks what actually rendered and shrinks until it fits, which
 // also covers browser text-zoom settings the math can't see.
-const ROWS_TO_FIT = 4;
+// Rows to size for, chosen per platform from its busiest column: BART usually
+// sends 3 trains per destination, sometimes more when two lines share a column.
+const MIN_ROWS = 3;
+const MAX_ROWS = 4;
 
 function rowsFit(el, n) {
   const box = el.getBoundingClientRect();
@@ -307,15 +310,15 @@ function rowsFit(el, n) {
   return true;
 }
 
-function fitColumn(el) {
+function fitColumn(el, rowsToFit) {
   const rows = el.querySelectorAll(".train");
   if (!rows.length) return Infinity;
   const vmin = Math.min(innerWidth, innerHeight) / 100;
   const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;   // dot + gap + slack
   const rowExtra = 1.6 * vmin + 1;                         // row padding + divider line
-  let num = Math.min((el.clientHeight / ROWS_TO_FIT - rowExtra) / 0.95,
+  let num = Math.min((el.clientHeight / rowsToFit - rowExtra) / 0.95,
                      (el.clientWidth - side) / 1.3);
-  const n = Math.min(ROWS_TO_FIT, rows.length);
+  const n = Math.min(rowsToFit, rows.length);
   for (let i = 0; i < 25; i++) {
     setColumnSize(el, num);
     if (num <= 8 || rowsFit(el, n)) break;
@@ -366,7 +369,10 @@ function layout() {
   // Both columns on a platform use the same size: the smaller of their best fits.
   for (const platform of ["1", "2"]) {
     const els = COLUMNS.filter(c => c.platform === platform).map(c => document.getElementById(c.id));
-    const num = Math.min(...els.map(fitColumn));
+    const columns = COLUMNS.filter(c => c.platform === platform);
+    const busiest = Math.max(...columns.map(c => lastTrains[c.id].length));
+    const rowsToFit = Math.min(MAX_ROWS, Math.max(MIN_ROWS, busiest));
+    const num = Math.min(...els.map(el => fitColumn(el, rowsToFit)));
     for (const el of els) {
       if (isFinite(num)) setColumnSize(el, num);
       dropOverflowRows(el);
