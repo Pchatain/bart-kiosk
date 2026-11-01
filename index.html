@@ -172,7 +172,8 @@
     color: var(--muted);
   }
   footer .tag { letter-spacing: 0.15em; }
-  #updated { text-align: right; }
+  footer .right { text-align: right; }
+  #version { margin-left: 1em; opacity: 0.6; }
   /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
     main { flex-direction: column; }
@@ -206,7 +207,8 @@
   <footer>
     <div>Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
-    <div id="updated">Updating&hellip;</div>
+    <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
+    <div class="right"><span id="updated">Updating&hellip;</span><span id="version">v8</span></div>
   </footer>
 
 <script>
