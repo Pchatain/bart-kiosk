@@ -101,14 +101,14 @@
     text-overflow: ellipsis;
   }
   .mins {
-    font-size: 3.4vh;
+    font-size: 5.1vh;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
   }
   .mins .unit {
-    font-size: 2vh;
+    font-size: 3vh;
     font-weight: 500;
     color: var(--muted);
     margin-left: 0.4vw;
@@ -159,6 +159,16 @@
 const API_URL ="https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=MW9S-E7SL-26DU-VV8V&json=y";
 const MAX_MINUTES = 30;
 const REFRESH_MS = 30000;
+
+// Short codes for destinations, keyed by the name the BART API returns.
+// Any destination not listed here is shown with its full name.
+const SHORT_NAMES = {
+  "Berryessa": "BERY",
+  "Berryessa/North San Jose": "BERY",
+  "Dublin/Pleasanton": "DUB",
+  "Daly City": "DALY",
+  "Richmond": "RICH"
+};
 
 function tickClock() {
   const now = new Date();
@@ -218,7 +228,7 @@ async function refresh() {
         const platform = est.platform;
         if (!byPlatform[platform]) byPlatform[platform] = [];
         byPlatform[platform].push({
-          destination: etd.destination,
+          destination: SHORT_NAMES[etd.destination] || etd.destination,
           minutes,
           hexcolor: est.hexcolor || "#888"
         });
