@@ -42,14 +42,17 @@
     font-weight: 600;
   }
   main {
+    /* --split: Platform 1's share of the width (0.25 = 25%). Set by dragging the divider. */
+    --split: 0.25;
+    --div-space: 4vmin;    /* divider width + its margins */
     flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2vmin;
+    display: flex;
     padding: 0 2vw 1vmin;
     min-height: 0;
   }
   .platform {
+    flex: 1 1 0;
+    min-width: 0;
     background: var(--panel);
     border-radius: 1.5vmin;
     padding: 1.5vmin 1.5vw;
@@ -58,13 +61,30 @@
     min-height: 0;
     overflow: hidden;
   }
-  .platform h2 {
-    font-size: 3vmin;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.6vmin;
+  .platform.p1 { flex: 0 0 calc((100% - var(--div-space)) * var(--split)); }
+  #divider {
+    flex: 0 0 1.6vmin;
+    margin: 0 1.2vmin;
+    background: #2f4268;
+    border-radius: 0.8vmin;
+    position: relative;
+    cursor: col-resize;
+    touch-action: none;
+    user-select: none;
   }
+  /* Wider invisible touch target so the divider is easy to grab. */
+  #divider::before { content: ""; position: absolute; top: 0; bottom: 0; left: -2.5vmin; right: -2.5vmin; }
+  /* Grip mark in the middle. */
+  #divider::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 0.5vmin; height: 9vmin;
+    transform: translate(-50%, -50%);
+    background: rgba(255,255,255,0.45);
+    border-radius: 0.2vmin;
+  }
+  #divider.dragging, #divider:focus-visible { background: var(--accent); outline: none; }
   .cols {
     flex: 1;
     display: grid;
@@ -78,6 +98,7 @@
     min-height: 0;
     min-width: 0;
   }
+  .col-head .plat { color: var(--accent); margin-right: 0.5em; }
   .col-head {
     font-size: 2.8vmin;
     font-weight: 700;
@@ -120,7 +141,9 @@
     /* Landscape: sized so 4 rows fit per column (17% of height), capped so
        "88" plus the dot fit a column (a quarter of the width). On landscape
        screens vmin is the height, so this is min(17vh, 12.5vw). */
-    font-size: min(17vmin, 12.5vw);
+    /* The script sets --num per column to the largest size that fits 4 rows;
+       this fallback is only used if the script hasn't run. */
+    font-size: var(--num, min(17vmin, 12.5vw));
     line-height: 0.95;
     letter-spacing: -0.02em;
     font-weight: 800;
@@ -128,7 +151,7 @@
     text-align: right;
     white-space: nowrap;
   }
-  .mins.leaving { color: #ffd34d; font-size: min(12vmin, 7.5vw); }
+  .mins.leaving { color: #ffd34d; font-size: var(--now, min(12vmin, 7.5vw)); }
   .empty, .error {
     font-size: 2.8vmin;
     color: var(--muted);
@@ -146,12 +169,13 @@
   }
   footer .tag { letter-spacing: 0.15em; }
   #updated { text-align: right; }
-  /* Portrait screens: stack the two platforms instead of side by side. */
+  /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
-    main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-    /* Each column is now ~45% of the width and ~35-40% of the height. */
-    .mins { font-size: min(7.5vh, 30vw); }
-    .mins.leaving { font-size: min(5.5vh, 17vw); }
+    main { flex-direction: column; }
+    .platform.p1 { flex-basis: calc((100% - var(--div-space)) * var(--split)); }
+    #divider { margin: 1.2vmin 0; cursor: row-resize; }
+    #divider::before { left: 0; right: 0; top: -2.5vmin; bottom: -2.5vmin; }
+    #divider::after { width: 9vmin; height: 0.5vmin; }
   }
 </style>
 </head>
@@ -161,18 +185,17 @@
     <div id="clock">--:--</div>
   </header>
   <main>
-    <section class="platform">
-      <h2>Platform 1</h2>
+    <section class="platform p1" aria-label="Platform 1">
       <div class="cols">
-        <div class="col"><div class="col-head">Berryessa</div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
-        <div class="col"><div class="col-head">Dublin</div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="plat">#1</span><span class="name" data-full="Berryessa" data-short="BERY">Berryessa</span></div><div class="trains" id="col-bery"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="name" data-full="Dublin" data-short="DUB">Dublin</span></div><div class="trains" id="col-dub"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
-    <section class="platform">
-      <h2>Platform 2</h2>
+    <div id="divider" role="separator" aria-label="Drag to resize platforms" tabindex="0"></div>
+    <section class="platform p2" aria-label="Platform 2">
       <div class="cols">
-        <div class="col"><div class="col-head">San Francisco</div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
-        <div class="col"><div class="col-head">Richmond</div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="plat">#2</span><span class="name" data-full="San Francisco" data-short="SF">San Francisco</span></div><div class="trains" id="col-sf"><div class="empty">Loading&hellip;</div></div></div>
+        <div class="col"><div class="col-head"><span class="name" data-full="Richmond" data-short="RICH">Richmond</span></div><div class="trains" id="col-rich"><div class="empty">Loading&hellip;</div></div></div>
       </div>
     </section>
   </main>
@@ -255,10 +278,95 @@ function renderColumn(el, trains) {
     }
     return row;
   }));
-  // Drop rows that don't fully fit rather than showing half a row.
+}
+
+// ---- Sizing -------------------------------------------------------------
+// Each column gets the largest numbers that fit ROWS_TO_FIT rows in its
+// height and "88" (plus the dot) in its width. The columns can be different
+// widths (the divider is draggable), so this is measured per column. After
+// sizing, it checks what actually rendered and shrinks until it fits, which
+// also covers browser text-zoom settings the math can't see.
+const ROWS_TO_FIT = 4;
+
+function rowsFit(el, n) {
+  const box = el.getBoundingClientRect();
+  const rows = [...el.querySelectorAll(".train")].slice(0, n);
+  for (const row of rows) {
+    if (row.getBoundingClientRect().bottom > box.bottom + 1) return false;
+    const mins = row.querySelector(".mins");
+    const dot = row.querySelector(".line-dot");
+    const range = document.createRange();
+    range.selectNodeContents(mins);
+    const text = range.getBoundingClientRect();
+    if (text.right > box.right + 1 || text.left < dot.getBoundingClientRect().right + 1) return false;
+  }
+  return true;
+}
+
+function fitColumn(el) {
+  const rows = el.querySelectorAll(".train");
+  if (!rows.length) return Infinity;
+  const vmin = Math.min(innerWidth, innerHeight) / 100;
+  const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;   // dot + gap + slack
+  const rowExtra = 1.6 * vmin + 1;                         // row padding + divider line
+  let num = Math.min((el.clientHeight / ROWS_TO_FIT - rowExtra) / 0.95,
+                     (el.clientWidth - side) / 1.3);
+  const n = Math.min(ROWS_TO_FIT, rows.length);
+  for (let i = 0; i < 25; i++) {
+    setColumnSize(el, num);
+    if (num <= 8 || rowsFit(el, n)) break;
+    num *= 0.95;
+  }
+  return num;
+}
+
+function setColumnSize(el, num) {
+  const vmin = Math.min(innerWidth, innerHeight) / 100;
+  const side = 3.6 * vmin + 0.8 * innerWidth / 100 + 4;
+  const now = Math.min(num * 0.72, (el.clientWidth - side) / 2.3);
+  el.style.setProperty("--num", Math.max(num, 8) + "px");
+  el.style.setProperty("--now", Math.max(now, 8) + "px");
+}
+
+// Drop rows that don't fully fit rather than showing half a row.
+function dropOverflowRows(el) {
   const bottom = el.getBoundingClientRect().bottom;
-  for (const row of [...el.children]) {
+  for (const row of [...el.querySelectorAll(".train")]) {
     if (row.getBoundingClientRect().bottom > bottom + 1) row.remove();
+  }
+}
+
+// Column headers switch to short codes (BERY, DUB, ...) when the full name
+// doesn't fit, and shrink if even the short code doesn't fit.
+function fitHeaders() {
+  for (const head of document.querySelectorAll(".col-head")) {
+    const name = head.querySelector(".name");
+    head.style.fontSize = "";
+    name.textContent = name.dataset.full;
+    if (head.scrollWidth <= head.clientWidth) continue;
+    name.textContent = name.dataset.short;
+    let size = parseFloat(getComputedStyle(head).fontSize);
+    while (head.scrollWidth > head.clientWidth && size > 8) {
+      size *= 0.92;
+      head.style.fontSize = size + "px";
+    }
+  }
+}
+
+let lastTrains = null;   // trains per column from the most recent refresh
+
+function layout() {
+  fitHeaders();
+  if (!lastTrains) return;
+  for (const c of COLUMNS) renderColumn(document.getElementById(c.id), lastTrains[c.id]);
+  // Both columns on a platform use the same size: the smaller of their best fits.
+  for (const platform of ["1", "2"]) {
+    const els = COLUMNS.filter(c => c.platform === platform).map(c => document.getElementById(c.id));
+    const num = Math.min(...els.map(fitColumn));
+    for (const el of els) {
+      if (isFinite(num)) setColumnSize(el, num);
+      dropOverflowRows(el);
+    }
   }
 }
 
@@ -286,10 +394,9 @@ async function refresh() {
         });
       }
     }
-    for (const c of COLUMNS) {
-      byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
-      renderColumn(document.getElementById(c.id), byColumn[c.id]);
-    }
+    for (const c of COLUMNS) byColumn[c.id].sort((a, b) => a.minutes - b.minutes);
+    lastTrains = byColumn;
+    layout();
 
     document.getElementById("updated").textContent =
       "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
@@ -301,6 +408,82 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, REFRESH_MS);
+
+// ---- Draggable divider --------------------------------------------------
+// Drag (or use arrow keys) to change how much room Platform 1 gets.
+// Double-tap resets to the default. The position is remembered on this device.
+const DEFAULT_SPLIT = 0.25;
+const SPLIT_KEY = "kiosk-split";
+const mainEl = document.querySelector("main");
+const divider = document.getElementById("divider");
+
+function setSplit(value, save) {
+  const split = Math.min(0.75, Math.max(0.15, value));
+  mainEl.style.setProperty("--split", split.toFixed(4));
+  if (save) {
+    try { localStorage.setItem(SPLIT_KEY, String(split)); } catch (e) { /* storage unavailable */ }
+  }
+  layout();
+}
+
+function savedSplit() {
+  try {
+    const v = parseFloat(localStorage.getItem(SPLIT_KEY));
+    return isNaN(v) ? DEFAULT_SPLIT : v;
+  } catch (e) {
+    return DEFAULT_SPLIT;
+  }
+}
+
+function splitAt(clientX, clientY) {
+  const portrait = matchMedia("(orientation: portrait)").matches;
+  const box = mainEl.getBoundingClientRect();
+  const cs = getComputedStyle(mainEl);
+  const divSpace = divider.getBoundingClientRect()[portrait ? "height" : "width"] +
+                   2 * parseFloat(getComputedStyle(divider)[portrait ? "marginTop" : "marginLeft"]);
+  const start = portrait ? box.top + parseFloat(cs.paddingTop) : box.left + parseFloat(cs.paddingLeft);
+  const size = (portrait ? box.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+                         : box.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) - divSpace;
+  const pos = (portrait ? clientY : clientX) - start - divSpace / 2;
+  return pos / size;
+}
+
+let dragFrame = 0;
+divider.addEventListener("pointerdown", e => {
+  divider.setPointerCapture(e.pointerId);
+  divider.classList.add("dragging");
+  e.preventDefault();
+});
+divider.addEventListener("pointermove", e => {
+  if (!divider.hasPointerCapture(e.pointerId)) return;
+  const x = e.clientX, y = e.clientY;
+  cancelAnimationFrame(dragFrame);
+  dragFrame = requestAnimationFrame(() => setSplit(splitAt(x, y), false));
+});
+function endDrag(e) {
+  if (!divider.classList.contains("dragging")) return;
+  divider.classList.remove("dragging");
+  cancelAnimationFrame(dragFrame);
+  setSplit(splitAt(e.clientX, e.clientY), true);
+}
+divider.addEventListener("pointerup", endDrag);
+divider.addEventListener("pointercancel", () => divider.classList.remove("dragging"));
+divider.addEventListener("dblclick", () => setSplit(DEFAULT_SPLIT, true));
+divider.addEventListener("keydown", e => {
+  const step = { ArrowLeft: -0.02, ArrowUp: -0.02, ArrowRight: 0.02, ArrowDown: 0.02 }[e.key];
+  if (step === undefined) return;
+  e.preventDefault();
+  const current = parseFloat(getComputedStyle(mainEl).getPropertyValue("--split")) || DEFAULT_SPLIT;
+  setSplit(current + step, true);
+});
+
+let resizeFrame = 0;
+addEventListener("resize", () => {
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(layout);
+});
+
+setSplit(savedSplit(), false);
 
 // Reload the page when a new version of it is published.
 // Every few minutes, fetch this page's own file and compare it to the version
