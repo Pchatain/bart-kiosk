@@ -1,0 +1,11 @@
+{
+  "name": "bart-kiosk-tests",
+  "private": true,
+  "description": "Layout tests for the kiosk page (the page itself has no build step).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
