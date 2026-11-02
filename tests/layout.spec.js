@@ -67,14 +67,14 @@ test("delays: 2 min or less ignored; 3-4 yellow; 5+ red; ticker lists them worst
     severity: m.classList.contains("major") ? "major" : "minor"
   })));
   expect(marks).toEqual(expect.arrayContaining([
-    { text: "Now", badge: "+10", severity: "major" },
-    { text: "36", badge: "+3", severity: "minor" },
-    { text: "24", badge: "+4", severity: "minor" },
-    { text: "Now", badge: "+3", severity: "minor" },
-    { text: "11", badge: "+3", severity: "minor" },
-    { text: "21", badge: "+5", severity: "major" },
-    { text: "25", badge: "+12", severity: "major" },
-    { text: "45", badge: "+5", severity: "major" }
+    { text: "Now", badge: "10", severity: "major" },
+    { text: "36", badge: "3", severity: "minor" },
+    { text: "24", badge: "4", severity: "minor" },
+    { text: "Now", badge: "3", severity: "minor" },
+    { text: "11", badge: "3", severity: "minor" },
+    { text: "21", badge: "5", severity: "major" },
+    { text: "25", badge: "12", severity: "major" },
+    { text: "45", badge: "5", severity: "major" }
   ]));
   expect(marks).toHaveLength(8);   // 149 s and 124 s delays are ignored
   const ticker = await page.textContent("#ticker-text");
