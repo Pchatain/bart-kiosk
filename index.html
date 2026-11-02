@@ -63,8 +63,8 @@
 
   /* ---- Platforms and the draggable divider ---- */
   main {
-    /* --split: Platform 1's share of the width (0.4 = 40%). Set by dragging the divider. */
-    --split: 0.4;
+    /* --split: Platform 1's share of the width (0.5 = 50%). Set by dragging the divider. */
+    --split: 0.5;
     --div-space: 4vmin;    /* divider width + its margins */
     flex: 1;
     display: flex;
@@ -144,11 +144,12 @@
      Each column is a size container, so its numbers can be sized from its own
      height and width (cqh/cqw). The script only sets, per platform:
        --rows   how many rows to fit (3 or 4)
-       --ratio  how wide a row is in "number font sizes": 1.3 fits "88";
-                2.0 also leaves room for a late badge
-       --fit    a correction factor (normally 1) if the result still overflows,
-                e.g. because of a browser text-zoom setting
-     Browsers without container units get --num-base/--now-base set in pixels
+       --ratio  how wide a row is in "number font sizes" (fits an outlined "88")
+       --fit    a correction factor (normally 1) if the rows actually shown are
+                wider than that (a late badge) or a browser text-zoom setting
+                makes things bigger. Measured from the real rows, so one late
+                train only shrinks its platform as much as it needs to.
+     Browsers without container units get --num-base set in pixels
      by the script, using the same formula (see sizeWithoutContainerUnits). */
   .trains {
     flex: 1;
@@ -159,11 +160,8 @@
     /* Largest number that fits --rows rows (row = 0.95 x font + 1.6vmin padding + 1px line)
        and fits the column width. */
     --num-base: min((100cqh / var(--rows, 3) - 1.6vmin - 1px) / 0.95,
-                    (100cqw - var(--side)) / var(--ratio, 1.3));
-    /* "Now" is about 1.75x wider than "88", so it gets its own size. */
-    --now-base: min(var(--num-base) * 0.72, (100cqw - var(--side)) / 2.3);
+                    (100cqw - var(--side)) / var(--ratio, 1.45));
     --num: calc(var(--num-base) * var(--fit, 1));
-    --now: calc(var(--now-base) * var(--fit, 1));
   }
   .train {
     display: flex;
@@ -202,15 +200,24 @@
     text-align: right;
     white-space: nowrap;
   }
-  .mins.leaving { color: #ffd34d; font-size: var(--now); }
-  /* Late trains (3+ min): an outline around the number plus a minutes-late badge beside
-     it, both light yellow for 3-4 min late and red for 5+. */
-  .mins.late { box-shadow: 0 0 0 0.045em var(--late-color); border-radius: 0.14em; padding: 0 0.06em; }
-  .mins.late.minor { --late-color: var(--minor); }
-  .mins.late.major { --late-color: var(--major); }
+  /* Trains arriving soon get an outline: yellow at 12 minutes or less, red at 6 or less. */
+  /* The outline hugs the digits (the inner span), not the two-digit slot. */
+  .mins span { display: inline-block; }
+  .mins.soon span { box-shadow: 0 0 0 0.045em var(--soon-color); border-radius: 0.14em; padding: 0 0.06em; --soon-color: var(--minor); }
+  .mins.soon.imminent span { --soon-color: var(--major); }
+  /* Late trains (3+ min): a minutes-late number beside the train, light yellow
+     for 3-4 min late and red for 5+. */
+  /* The badge sits on the number's top-right corner, so it takes no width
+     and a late train doesn't shrink its platform. A ring in the panel color
+     separates it from the digit underneath. */
+  .mins { position: relative; }
   .late-badge {
-    align-self: flex-start;
-    font-size: calc(var(--num) * 0.26);
+    position: absolute;
+    top: 0;
+    right: 0;
+    box-shadow: 0 0 0 0.14em var(--panel);
+    font-size: calc(var(--num) * 0.19);   /* small, so it covers little of the number */
+    letter-spacing: 0;
     font-weight: 800;
     line-height: 1;
     padding: 0.18em 0.42em;
@@ -381,7 +388,7 @@
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.1</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.2</span></div>
   </footer>
 
 <script>
@@ -405,14 +412,15 @@ const STALE_AFTER_FAILURES = 3;            // fade the board after this many fai
 
 const LATE_THRESHOLD_MIN = 3;              // delays of 2 min or less are ignored
 const MAJOR_DELAY_MIN = 5;                 // 3-4 min late: light yellow; 5+: red
+const SOON_MIN = 12;                       // outline trains this close: yellow...
+const IMMINENT_MIN = 6;                    // ...and red at this close or closer
 const TICKER_SPEED_VMIN_PER_S = 14;        // ticker speed, in % of the screen's shorter side per second
 
 // Rows each platform is sized for, from its busiest column: BART usually sends
 // 3 trains per destination, sometimes more when two lines share a column.
 const MIN_ROWS = 3;
 const MAX_ROWS = 4;
-const WIDTH_RATIO = 1.3;                   // row width in number-font-sizes: fits "88"
-const WIDTH_RATIO_WITH_BADGE = 2.0;        // ...plus a minutes-late badge
+const WIDTH_RATIO = 1.45;                  // row width in number-font-sizes: fits an outlined "88"
 
 // Weather screen
 const LOCATION = { lat: 37.78, lon: -122.24 };               // Oakland Estuary by Fruitvale
@@ -426,7 +434,7 @@ const RAIN_POSSIBLE_PCT = 30;                                 // an hour at or a
 const RAIN_LIKELY_PCT = 60;
 const WEATHER_STALE_MS = 60 * 60 * 1000;                      // say "as of" when older than this
 
-const DEFAULT_SPLIT = 0.4;                 // Platform 1's default share of the width
+const DEFAULT_SPLIT = 0.5;                 // Platform 1's default share of the width
 const SPLIT_KEY = "kiosk-split";
 
 // Short codes for destinations, keyed by the name the BART API returns.
@@ -708,12 +716,15 @@ function renderRow(t) {
   const row = div("train");
   const dot = div("line-dot");
   dot.style.background = t.color;
-  const mins = t.minutes === 0 ? div("mins leaving", "Now") : div("mins", String(t.minutes));
+  // "0" rather than "Now": same width as other numbers, so it gets the same size.
+  const mins = div(t.minutes === 0 ? "mins leaving" : "mins");
+  mins.append(el("span", "", String(t.minutes)));
+  if (t.minutes <= SOON_MIN) mins.classList.add("soon");
+  if (t.minutes <= IMMINENT_MIN) mins.classList.add("imminent");
   const parts = t.showDest ? [dot, div("dest", t.shortName), mins] : [dot, mins];
   if (t.lateMin) {
     const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
-    mins.classList.add("late", severity);
-    parts.push(div("late-badge " + severity, String(t.lateMin)));   // minutes late; no "+" (it read as addition)
+    mins.append(div("late-badge " + severity, String(t.lateMin)));   // minutes late; no "+" (it read as addition)
   }
   row.append(...parts);
   return row;
@@ -726,9 +737,8 @@ function renderBoard(trains) {
     const busiest = Math.max(...columns.map(c => trains[c.id].length));
     const rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, busiest));
     const shown = columns.map(c => trains[c.id].slice(0, rows));
-    const hasBadge = shown.some(list => list.some(t => t.lateMin));
     platEl.style.setProperty("--rows", rows);
-    platEl.style.setProperty("--ratio", hasBadge ? WIDTH_RATIO_WITH_BADGE : WIDTH_RATIO);
+    platEl.style.setProperty("--ratio", WIDTH_RATIO);   // late badges are handled by measuring (fitPlatform)
     columns.forEach((c, i) => {
       const el = document.getElementById(c.id);
       el.replaceChildren(...(shown[i].length ? shown[i].map(renderRow) : [div("empty", "No trains")]));
@@ -1064,7 +1074,7 @@ function overflowScale(platEl) {
   return scale;
 }
 
-// Same formula as the --num-base/--now-base CSS, in pixels, for browsers
+// Same formula as the --num-base CSS, in pixels, for browsers
 // without container units.
 function sizeWithoutContainerUnits(platEl) {
   const vmin = Math.min(innerWidth, innerHeight) / 100;
@@ -1074,9 +1084,7 @@ function sizeWithoutContainerUnits(platEl) {
   const ratio = parseFloat(style.getPropertyValue("--ratio")) || WIDTH_RATIO;
   for (const col of platEl.querySelectorAll(".trains")) {
     const num = Math.min((col.clientHeight / rows - 1.6 * vmin - 1) / 0.95, (col.clientWidth - side) / ratio);
-    const now = Math.min(num * 0.72, (col.clientWidth - side) / 2.3);
     col.style.setProperty("--num-base", Math.max(num, 8) + "px");
-    col.style.setProperty("--now-base", Math.max(now, 8) + "px");
   }
 }
 
