@@ -118,6 +118,12 @@ async function layoutProblems(page) {
         if (text.right > box.right + 1) problems.push(`${label}: number clipped on the right`);
         if (text.right > own.right + 1 || text.left < own.left - 1) problems.push(`${label}: number spills out of its outline`);
         if (text.left < rect(row.querySelector(".line-dot")).right + 1) problems.push(`${label}: number touches its dot`);
+        const outline = mins.querySelector("span");
+        if (outline && mins.classList.contains("soon")) {
+          const o = rect(outline), r = rect(row);
+          if (o.top < r.top - 1 || o.bottom > r.bottom + 1) problems.push(`${label}: outline spills out of its row`);
+          if (o.right > box.right + 1) problems.push(`${label}: outline clipped on the right`);
+        }
         const badge = row.querySelector(".late-badge");
         if (badge) {
           const b = rect(badge);
