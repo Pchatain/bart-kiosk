@@ -145,7 +145,7 @@
      height and width (cqh/cqw). The script only sets, per platform:
        --rows   how many rows to fit (3 or 4)
        --ratio  how wide a row is in "number font sizes": 1.3 fits "88";
-                2.0 also leaves room for a "+N" late badge
+                2.0 also leaves room for a late badge
        --fit    a correction factor (normally 1) if the result still overflows,
                 e.g. because of a browser text-zoom setting
      Browsers without container units get --num-base/--now-base set in pixels
@@ -203,7 +203,7 @@
     white-space: nowrap;
   }
   .mins.leaving { color: #ffd34d; font-size: var(--now); }
-  /* Late trains (3+ min): an outline around the number plus a "+N" badge beside
+  /* Late trains (3+ min): an outline around the number plus a minutes-late badge beside
      it, both light yellow for 3-4 min late and red for 5+. */
   .mins.late { box-shadow: 0 0 0 0.045em var(--late-color); border-radius: 0.14em; padding: 0 0.06em; }
   .mins.late.minor { --late-color: var(--minor); }
@@ -381,7 +381,7 @@
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.1</span></div>
   </footer>
 
 <script>
@@ -412,7 +412,7 @@ const TICKER_SPEED_VMIN_PER_S = 14;        // ticker speed, in % of the screen's
 const MIN_ROWS = 3;
 const MAX_ROWS = 4;
 const WIDTH_RATIO = 1.3;                   // row width in number-font-sizes: fits "88"
-const WIDTH_RATIO_WITH_BADGE = 2.0;        // ...plus a "+N" late badge
+const WIDTH_RATIO_WITH_BADGE = 2.0;        // ...plus a minutes-late badge
 
 // Weather screen
 const LOCATION = { lat: 37.78, lon: -122.24 };               // Oakland Estuary by Fruitvale
@@ -713,7 +713,7 @@ function renderRow(t) {
   if (t.lateMin) {
     const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
     mins.classList.add("late", severity);
-    parts.push(div("late-badge " + severity, "+" + t.lateMin));
+    parts.push(div("late-badge " + severity, String(t.lateMin)));   // minutes late; no "+" (it read as addition)
   }
   row.append(...parts);
   return row;
