@@ -62,7 +62,7 @@ test("delays: 2 min or less ignored; 3-4 yellow; 5+ red; ticker lists them worst
   await page.setViewportSize({ width: 1280, height: 800 });
   await openBoard(page, { etd: SCENARIOS.delays });
   const marks = await page.$$eval(".late-badge", els => els.map(b => ({
-    text: b.parentElement.querySelector(".mins").textContent,
+    text: b.closest(".mins").querySelector("span").textContent,
     badge: b.textContent,
     severity: b.classList.contains("major") ? "major" : "minor"
   })));
@@ -78,9 +78,14 @@ test("delays: 2 min or less ignored; 3-4 yellow; 5+ red; ticker lists them worst
   ]));
   expect(marks).toHaveLength(8);   // 149 s and 124 s delays are ignored
   // Being late doesn't outline a train; only arriving soon does (25 is late but far away).
-  expect(await page.evaluate(() => [...document.querySelectorAll(".mins")].find(m => m.textContent === "25").classList.contains("soon"))).toBe(false);
+  expect(await page.evaluate(() => [...document.querySelectorAll(".mins")].find(m => m.querySelector("span").textContent === "25").classList.contains("soon"))).toBe(false);
   const ticker = await page.textContent("#ticker-text");
   expect(ticker.startsWith("⚠ Richmond train in 25 min is running 12 min late")).toBe(true);
+  // The badge takes no width: a late train doesn't shrink its platform.
+  const late = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("#col-rich .mins")).fontSize));
+  await openBoard(page, { etd: SCENARIOS.delays.map(d => ({ ...d, estimate: d.estimate.map(e => ({ ...e, delay: "0" })) })), bsa: ADVISORY });
+  const onTime = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("#col-rich .mins")).fontSize));
+  expect(Math.abs(late - onTime)).toBeLessThanOrEqual(1);
 });
 
 test("ticker: hidden with nothing to report, shows advisories, scrolls when long", async ({ page }) => {
@@ -159,7 +164,7 @@ test("outlines: yellow at 12 minutes or less, red at 6 or less, none further out
     { destination: "Richmond", estimate: [est(9, 2, ORANGE), est(32, 2, ORANGE), est(52, 2, ORANGE)] }
   ] });
   const outline = await page.$$eval(".mins", els => Object.fromEntries(els.map(m =>
-    [m.textContent, m.classList.contains("imminent") ? "red" : m.classList.contains("soon") ? "yellow" : "none"])));
+    [m.querySelector("span").textContent, m.classList.contains("imminent") ? "red" : m.classList.contains("soon") ? "yellow" : "none"])));
   expect(outline).toMatchObject({ "0": "red", "6": "red", "7": "yellow", "12": "yellow", "13": "none", "2": "red", "9": "yellow", "22": "none" });
   expect(await page.textContent("#col-bery")).not.toContain("Now");
   expect(await layoutProblems(page)).toEqual([]);

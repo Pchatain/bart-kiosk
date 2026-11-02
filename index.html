@@ -207,9 +207,17 @@
   .mins.soon.imminent span { --soon-color: var(--major); }
   /* Late trains (3+ min): a minutes-late number beside the train, light yellow
      for 3-4 min late and red for 5+. */
+  /* The badge sits on the number's top-right corner, so it takes no width
+     and a late train doesn't shrink its platform. A ring in the panel color
+     separates it from the digit underneath. */
+  .mins { position: relative; }
   .late-badge {
-    align-self: flex-start;
-    font-size: calc(var(--num) * 0.26);
+    position: absolute;
+    top: 0;
+    right: 0;
+    box-shadow: 0 0 0 0.14em var(--panel);
+    font-size: calc(var(--num) * 0.3);
+    letter-spacing: 0;
     font-weight: 800;
     line-height: 1;
     padding: 0.18em 0.42em;
@@ -716,7 +724,7 @@ function renderRow(t) {
   const parts = t.showDest ? [dot, div("dest", t.shortName), mins] : [dot, mins];
   if (t.lateMin) {
     const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
-    parts.push(div("late-badge " + severity, String(t.lateMin)));   // minutes late; no "+" (it read as addition)
+    mins.append(div("late-badge " + severity, String(t.lateMin)));   // minutes late; no "+" (it read as addition)
   }
   row.append(...parts);
   return row;

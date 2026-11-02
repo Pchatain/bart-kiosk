@@ -114,7 +114,8 @@ async function layoutProblems(page) {
         const label = `${col.id} "${row.textContent}"`;
         if (rect(row).bottom > box.bottom + 1) problems.push(`${label}: row cut off at the bottom`);
         const mins = row.querySelector(".mins");
-        const own = rect(mins), text = textRect(mins);
+        const digits = mins.querySelector("span");
+        const own = rect(mins), text = textRect(digits);
         if (text.right > box.right + 1) problems.push(`${label}: number clipped on the right`);
         if (text.right > own.right + 1 || text.left < own.left - 1) problems.push(`${label}: number spills out of its outline`);
         if (text.left < rect(row.querySelector(".line-dot")).right + 1) problems.push(`${label}: number touches its dot`);
@@ -124,11 +125,12 @@ async function layoutProblems(page) {
           if (o.top < r.top - 1 || o.bottom > r.bottom + 1) problems.push(`${label}: outline spills out of its row`);
           if (o.right > box.right + 1) problems.push(`${label}: outline clipped on the right`);
         }
+        // The late badge overlaps the number's top-right corner on purpose; it must stay fully visible.
         const badge = row.querySelector(".late-badge");
         if (badge) {
           const b = rect(badge);
-          if (b.left < Math.max(own.right, text.right) + 1) problems.push(`${label}: badge touches the number`);
-          if (b.right > box.right + 1) problems.push(`${label}: badge clipped`);
+          if (b.right > box.right + 1 || b.top < box.top - 1) problems.push(`${label}: badge clipped`);
+          if (b.left < rect(row.querySelector(".line-dot")).right) problems.push(`${label}: badge covers the dot`);
         }
       }
     }
@@ -148,7 +150,7 @@ async function columnSummary(page) {
     return [col.id, {
       rows: col.querySelectorAll(".train").length,
       fontPx: n ? Math.round(parseFloat(getComputedStyle(n).fontSize)) : null,
-      text: [...col.querySelectorAll(".train")].map(r => r.textContent)
+      text: [...col.querySelectorAll(".mins > span")].map(s => s.textContent)
     }];
   })));
 }
