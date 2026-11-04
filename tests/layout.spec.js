@@ -155,9 +155,24 @@ test("browser text zoom: numbers shrink until everything fits", async ({ page })
   expect(await layoutProblems(page)).toEqual([]);
 });
 
-test("outlines: yellow at 12 minutes or less, red at 6 or less, none further out; 0 instead of Now", async ({ page }) => {
+const SOON_TRAINS = [
+  { destination: "Berryessa", estimate: [est("Leaving", 1, ORANGE), est(6, 1, ORANGE), est(7, 1, ORANGE)] },
+  { destination: "Dublin/Pleasanton", estimate: [est(12, 1, BLUE), est(13, 1, BLUE), est(30, 1, BLUE)] },
+  { destination: "Daly City", estimate: [est(2, 2, BLUE), est(22, 2, BLUE), est(42, 2, BLUE)] },
+  { destination: "Richmond", estimate: [est(9, 2, ORANGE), est(32, 2, ORANGE), est(52, 2, ORANGE)] }
+];
+
+test("arrival outlines are off by default (feature flag)", async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 600 });
-  await openBoard(page, { etd: [
+  await openBoard(page, { etd: SOON_TRAINS });
+  expect(await page.locator(".mins.soon, .mins.imminent").count()).toBe(0);
+  expect(await page.textContent("#col-bery")).not.toContain("Now");
+  expect(await layoutProblems(page)).toEqual([]);
+});
+
+test("outlines when turned on: yellow at 12 minutes or less, red at 6 or less, none further out", async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 600 });
+  await openBoard(page, { query: "?outlines=on", etd: [
     { destination: "Berryessa", estimate: [est("Leaving", 1, ORANGE), est(6, 1, ORANGE), est(7, 1, ORANGE)] },
     { destination: "Dublin/Pleasanton", estimate: [est(12, 1, BLUE), est(13, 1, BLUE), est(30, 1, BLUE)] },
     { destination: "Daly City", estimate: [est(2, 2, BLUE), est(22, 2, BLUE), est(42, 2, BLUE)] },

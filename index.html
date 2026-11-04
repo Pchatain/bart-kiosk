@@ -388,7 +388,7 @@
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.2</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.3</span></div>
   </footer>
 
 <script>
@@ -412,6 +412,9 @@ const STALE_AFTER_FAILURES = 3;            // fade the board after this many fai
 
 const LATE_THRESHOLD_MIN = 3;              // delays of 2 min or less are ignored
 const MAJOR_DELAY_MIN = 5;                 // 3-4 min late: light yellow; 5+: red
+// Feature flag: outline trains arriving soon (yellow / red). Turned off in v10.3;
+// set to true to bring the outlines back. "?outlines=on" turns them on for testing.
+const SHOW_ARRIVAL_OUTLINES = false || /[?&]outlines=on\b/.test(location.search);
 const SOON_MIN = 12;                       // outline trains this close: yellow...
 const IMMINENT_MIN = 6;                    // ...and red at this close or closer
 const TICKER_SPEED_VMIN_PER_S = 14;        // ticker speed, in % of the screen's shorter side per second
@@ -719,8 +722,8 @@ function renderRow(t) {
   // "0" rather than "Now": same width as other numbers, so it gets the same size.
   const mins = div(t.minutes === 0 ? "mins leaving" : "mins");
   mins.append(el("span", "", String(t.minutes)));
-  if (t.minutes <= SOON_MIN) mins.classList.add("soon");
-  if (t.minutes <= IMMINENT_MIN) mins.classList.add("imminent");
+  if (SHOW_ARRIVAL_OUTLINES && t.minutes <= SOON_MIN) mins.classList.add("soon");
+  if (SHOW_ARRIVAL_OUTLINES && t.minutes <= IMMINENT_MIN) mins.classList.add("imminent");
   const parts = t.showDest ? [dot, div("dest", t.shortName), mins] : [dot, mins];
   if (t.lateMin) {
     const severity = t.lateMin >= MAJOR_DELAY_MIN ? "major" : "minor";
