@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.bart.gov https://api.open-meteo.com https://api.tidesandcurrents.noaa.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
+  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://api.bart.gov https://raw.githubusercontent.com https://api.tidesandcurrents.noaa.gov; img-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Fruitvale BART Departures</title>
 <style>
   :root {
@@ -53,7 +53,7 @@
   #screen-toggle svg { width: 100%; height: 100%; display: block; }
   #screen-toggle .to-trains, body.show-weather #screen-toggle .to-weather { display: none; }
   body.show-weather #screen-toggle .to-trains { display: block; }
-  main[hidden], #weather[hidden] { display: none; }
+  main[hidden], #weather[hidden], #wind[hidden] { display: none; }
   body.show-weather #ticker { display: none; }
   #clock {
     font-size: 4.5vmin;
@@ -317,10 +317,46 @@
   }
   .rain-bar { flex: 1; display: flex; align-items: flex-end; background: rgba(77,163,255,0.08); border-radius: 0.4vmin 0.4vmin 0 0; }
   .rain-bar i { display: block; width: 100%; border-radius: 0.4vmin 0.4vmin 0 0; background: rgba(77,163,255,0.35); }
-  .rain-bar.possible i { background: rgba(77,163,255,0.7); }
-  .rain-bar.likely i { background: #4da3ff; }
+  .rain-bar.wet i { background: rgba(77,163,255,0.7); }
+  .rain-bar.heavy i { background: #4da3ff; }
   .rain-hours { display: flex; gap: 0.25vw; font-size: 2vmin; color: var(--muted); margin-top: 0.4vmin; }
   .rain-hours span { flex: 1; white-space: nowrap; overflow: visible; }
+
+  /* ---- Wind screen: one row per hour, the course drawn left to right ---- */
+  #wind {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-auto-rows: 1fr;
+    gap: 1.5vmin;
+    padding: 0 2vw 1vmin;
+  }
+  .wind-row {
+    background: var(--panel);
+    border-radius: 1.5vmin;
+    display: flex;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .wind-info {
+    flex: 0 0 31vmin;
+    padding: 1vmin 1.5vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .wind-hour { font-size: 5vmin; font-weight: 800; line-height: 1.1; }
+  .wind-hour small { font-size: 2.4vmin; font-weight: 400; color: var(--muted); }
+  .wind-speed { font-size: 5.4vmin; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .wind-speed small { font-size: 2.6vmin; font-weight: 400; color: var(--muted); }
+  .wind-detail { font-size: 2.5vmin; color: var(--muted); }
+  .wind-map { flex: 1; min-width: 0; min-height: 0; position: relative; background: #101a2e; }
+  .wind-map svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .wind-map text { font-weight: 700; paint-order: stroke; stroke: #101a2e; stroke-linejoin: round; }
+  #wind > .wx-message { padding: 2vmin 1vw; }
 
   /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
@@ -331,6 +367,8 @@
     #divider::after { width: 9vmin; height: 0.5vmin; }
     #weather { grid-template-columns: 1fr; grid-template-rows: 1.4fr auto auto; }
     .wx-tides { grid-row: auto; }
+    .wind-row { flex-direction: column; }
+    .wind-info { flex: none; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 1.2em; }
   }
 </style>
 </head>
@@ -383,12 +421,13 @@
       <div class="rain-hours" id="rain-hours"></div>
     </div>
   </section>
+  <section id="wind" hidden aria-label="Wind along the rowing course"></section>
   <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v10.3</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v11</span></div>
   </footer>
 
 <script>
@@ -431,10 +470,13 @@ const WEATHER_HOURS = { from: 5 * 60, until: 7 * 60 };       // show weather 5:0
 const PRACTICE_HOURS = { from: 6 * 60 + 30, until: 8 * 60 + 30 };
 const TIDE_CHART_HOURS = { from: 4 * 60, until: 11 * 60 };   // time range drawn on the tide chart
 const MANUAL_SWITCH_MS = 5 * 60 * 1000;                      // a tap on the icon lasts this long
+const WEATHER_PAGE_MS = 20 * 1000;                            // the weather screen alternates tides and wind this often
+const WIND_ROW_HOURS = [7, 8, 9];                             // hours shown on the wind page (the data file has 5-10 AM)
 const WEATHER_EVERY_MS = 15 * 60 * 1000;
 const TIDES_EVERY_MS = 3 * 60 * 60 * 1000;
-const RAIN_POSSIBLE_PCT = 30;                                 // an hour at or above this counts as rain
-const RAIN_LIKELY_PCT = 60;
+const RAIN_MIN_IN = 0.01;                                     // an hour with at least this much counts as rain
+const RAIN_HEAVY_IN = 0.1;                                    // inches in an hour
+const RAIN_BAR_FULL_IN = 0.2;                                 // a full-height bar on the rain chart
 const WEATHER_STALE_MS = 60 * 60 * 1000;                      // say "as of" when older than this
 
 const DEFAULT_SPLIT = 0.5;                 // Platform 1's default share of the width
@@ -463,8 +505,8 @@ const PLATFORMS = ["1", "2"];
 // Container units (cqw/cqh) let CSS do the sizing. Older browsers get the same
 // formula computed in the script. "?nocq" in the address forces that path, for testing.
 const USE_CONTAINER_UNITS = CSS.supports("height: 1cqh") && !/[?&]nocq\b/.test(location.search);
-// "?screen=weather" or "?screen=trains" in the address pins a screen (for testing).
-const PINNED_SCREEN = (location.search.match(/[?&]screen=(weather|trains)\b/) || [])[1] || null;
+// "?screen=weather" (tides page), "?screen=wind" or "?screen=trains" in the address pins a screen (for testing).
+const PINNED_SCREEN = (location.search.match(/[?&]screen=(weather|wind|trains)\b/) || [])[1] || null;
 
 // =============================================================================
 // State: everything the screen shows comes from here
@@ -473,12 +515,15 @@ const state = {
   departures: null,    // { byColumn: {colId: [train]}, fetchedAt } from the last successful refresh
   failures: 0,         // failed departure refreshes in a row
   advisories: [],      // BART service advisory texts
-  weather: null,       // { current, hourly, fetchedAt } from the weather provider
+  weather: null,       // { hourly, wind, points, run, fetchedAt } from the weather provider
   weatherFailed: false,
+  map: null,           // the rowing course map (data/estuary-map.json); loaded once
+  pageSince: null,     // when the weather screen started alternating its pages
   tides: null,         // { events, curve, fetchedAt } from the tide provider
   tidesFailed: false,
   manual: null,        // { screen, until } after a tap on the icon
-  shownScreen: null
+  shownScreen: null,
+  shownPage: null
 };
 
 // =============================================================================
@@ -574,27 +619,34 @@ async function fetchAdvisories() {
 }
 
 // =============================================================================
-// Weather provider. To switch weather services, replace this object: the
-// screen only uses what fetchForecast() returns.
+// Weather provider: the WOOF forecast (woof.recastsystems.com), a fine-grid model
+// run for San Francisco Bay. WOOF doesn't allow requests from web pages, so a
+// GitHub Action (.github/workflows/estuary-wind.yml) saves the forecast in this
+// repository's data/ folder and the page reads it from there.
+// To switch weather services, replace this object: the screen only uses what
+// fetchForecast() and fetchMap() return.
 // =============================================================================
+const DATA_URL = "https://raw.githubusercontent.com/Pchatain/bart-kiosk/main/data/";
 const weatherProvider = {
-  name: "Open-Meteo",
-  // Returns { current: { tempF, windMph, windFromDeg }, hourly: [{ time, rainPct, rainIn }] }, times in ms.
+  name: "WOOF, Recast",
+  // Returns { hourly, wind, points, run }, times in ms:
+  //   hourly: [{ time, tempF, windMph, windFromDeg, rainIn }] at the boathouse; rainIn is the rain
+  //           during the hour starting at `time` (null where the forecast hasn't got that far).
+  //   wind:   [{ time, speedMph: [], fromDeg: [], gustMph: [] }] for morning hours, one value per map point.
   async fetchForecast() {
-    const d = await fetchJson("https://api.open-meteo.com/v1/forecast" +
-      `?latitude=${LOCATION.lat}&longitude=${LOCATION.lon}` +
-      "&current=temperature_2m,wind_speed_10m,wind_direction_10m" +
-      "&hourly=precipitation_probability,precipitation" +
-      "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch" +
-      "&timeformat=unixtime&timezone=GMT&forecast_days=3");
-    return {
-      current: { tempF: d.current.temperature_2m, windMph: d.current.wind_speed_10m, windFromDeg: d.current.wind_direction_10m },
-      hourly: d.hourly.time.map((t, i) => ({
-        time: t * 1000,
-        rainPct: d.hourly.precipitation_probability[i] || 0,
-        rainIn: d.hourly.precipitation[i] || 0
-      }))
-    };
+    const d = await fetchJson(DATA_URL + "estuary-wind.json");
+    const b = d.boathouse;
+    const hourly = b.time.map((t, i) => ({
+      time: t * 1000,
+      tempF: b.tempF[i], windMph: b.windMph[i], windFromDeg: b.windFromDeg[i],
+      rainIn: i + 1 < b.time.length ? b.rainIn[i + 1] : null   // WOOF gives the total over the hour before each time
+    }));
+    if (!hourly.length || hourly[hourly.length - 1].time < Date.now()) throw new Error("forecast is out of date");
+    return { hourly, wind: d.wind.map(w => ({ ...w, time: w.time * 1000 })), points: d.points, run: d.run };
+  },
+  // The course map: { water, course, landmarks, grid, points, courseBox, northDeg }. See data/estuary-map.json.
+  fetchMap() {
+    return fetchJson(DATA_URL + "estuary-map.json");
   }
 };
 
@@ -655,6 +707,11 @@ async function updateDepartures() {
 }
 
 async function updateWeather() {
+  try {
+    if (!state.map) state.map = await weatherProvider.fetchMap();
+  } catch (err) {
+    console.log("Map error:", err.message);
+  }
   try {
     state.weather = { ...(await weatherProvider.fetchForecast()), fetchedAt: Date.now() };
     state.weatherFailed = false;
@@ -767,7 +824,7 @@ function scheduledScreen(now) {
 }
 
 function activeScreen(now = Date.now()) {
-  if (PINNED_SCREEN) return PINNED_SCREEN;
+  if (PINNED_SCREEN) return PINNED_SCREEN === "trains" ? "trains" : "weather";
   if (state.manual && now < state.manual.until) return state.manual.screen;
   return scheduledScreen(now);
 }
@@ -780,15 +837,29 @@ function toggleScreen() {
   render();
 }
 
-function renderScreenChrome(screen) {
+// The weather screen has two pages, tides and wind, that take turns. A tap on the page switches.
+function weatherPage(now = Date.now()) {
+  if (PINNED_SCREEN) return PINNED_SCREEN === "wind" ? "wind" : "tides";
+  if (state.pageSince === null) return "tides";
+  return Math.floor((now - state.pageSince) / WEATHER_PAGE_MS) % 2 ? "wind" : "tides";
+}
+
+function togglePage() {
+  const now = Date.now();
+  state.pageSince = weatherPage(now) === "tides" ? now - WEATHER_PAGE_MS : now;
+  render();
+}
+
+function renderScreenChrome(screen, page) {
   const weather = screen === "weather";
   document.body.classList.toggle("show-weather", weather);
   document.querySelector("main").hidden = weather;
-  document.getElementById("weather").hidden = !weather;
-  document.getElementById("title-word").textContent = weather ? "Weather" : "BART";
+  document.getElementById("weather").hidden = !(weather && page === "tides");
+  document.getElementById("wind").hidden = !(weather && page === "wind");
+  document.getElementById("title-word").textContent = !weather ? "BART" : page === "wind" ? "Wind" : "Weather";
   document.getElementById("screen-toggle").setAttribute("aria-label", weather ? "Show trains" : "Show weather");
   document.getElementById("footer-note").textContent = weather
-    ? `Weather: ${weatherProvider.name} \u00b7 Tides: ${tideProvider.name}`
+    ? `Forecast by ${weatherProvider.name} \u00b7 Tides: ${tideProvider.name}`
     : "Departures within the next 60 minutes";
 }
 
@@ -819,15 +890,18 @@ function renderWeatherStatus() {
 
 function render() {
   const screen = activeScreen();
+  if (screen === "weather" && state.shownScreen !== "weather") state.pageSince = Date.now();
+  const page = screen === "weather" ? weatherPage() : null;
   state.shownScreen = screen;
-  renderScreenChrome(screen);
+  state.shownPage = page;
+  renderScreenChrome(screen, page);
   const trains = currentTrains();
   if (trains) renderBoard(trains);
   setTicker(tickerMessages(trains));
   renderStatus();
   if (screen === "weather") {
     renderWeatherStatus();
-    renderWeather(Date.now());
+    if (page === "wind") renderWind(Date.now()); else renderWeather(Date.now());
   } else {
     fitAll();
   }
@@ -877,15 +951,14 @@ function tideSummary(tides, start, end) {
   return { headline, detail };
 }
 
-// Hours of rain in the next 24 hours, in words.
+// Rain in the next 24 hours, in words. `hours` are the hours the forecast covers.
 function rainSummary(hourly, now) {
   const start = now - (now % 3600000);
-  const hours = hourly.filter(h => h.time >= start && h.time < start + 24 * 3600000);
-  const max = Math.max(0, ...hours.map(h => h.rainPct));
+  const hours = hourly.filter(h => h.time >= start && h.time < start + 24 * 3600000 && h.rainIn !== null);
   const windows = [];
   for (const h of hours) {
     const last = windows[windows.length - 1];
-    if (h.rainPct < RAIN_POSSIBLE_PCT) continue;
+    if (h.rainIn < RAIN_MIN_IN) continue;
     if (last && h.time - last[last.length - 1].time <= 3600000) last.push(h); else windows.push([h]);
   }
   const when = t => {
@@ -897,16 +970,18 @@ function rainSummary(hourly, now) {
     const from = w[0].time, to = w[w.length - 1].time + 3600000;
     return (from <= start ? "now" : when(from) + hourTime(from)) + " \u2013 " + hourTime(to);
   };
+  if (!hours.length) return { hours, headline: "No rain forecast yet", detail: "" };
   if (!windows.length) {
-    return { hours, headline: "No rain expected", detail: `Chance stays at or below <b>${max}%</b> all day and tonight` };
+    const until = hours.length < 24 ? `Dry until at least <b>${hourTime(hours[hours.length - 1].time + 3600000)}</b>` : "Dry all day and tonight";
+    return { hours, headline: "No rain expected", detail: until };
   }
   const first = windows[0];
-  const peak = Math.max(...first.map(h => h.rainPct));
+  const peak = Math.max(...first.map(h => h.rainIn));
   const total = hours.reduce((sum, h) => sum + h.rainIn, 0);
-  const detail = [`Up to <b>${peak}%</b> chance`];
-  if (total >= 0.01) detail.push(`about <b>${total.toFixed(2)} in</b> total`);
+  const detail = [`About <b>${total.toFixed(2)} in</b> total`, `peak <b>${peak.toFixed(2)} in</b>/hr`];
   if (windows.length > 1) detail.push(`again ${range(windows[1])}`);
-  return { hours, headline: `Rain ${peak >= RAIN_LIKELY_PCT ? "likely" : "possible"} ${range(first)}`, detail: detail.join(" \u00b7 ") };
+  const kind = peak >= RAIN_HEAVY_IN ? "Heavy rain" : total < 0.05 ? "Light rain" : "Rain";
+  return { hours, headline: `${kind} ${range(first)}`, detail: detail.join(" \u00b7 ") };
 }
 
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -953,8 +1028,8 @@ function renderWeather(now) {
   const sunDetail = el("div", "wx-detail");
   setHtml(sunDetail, `First light <b>${shortTime(sun.firstLight)}</b> \u00b7 Sunset <b>${shortTime(sun.sunset)}</b>`);
   const parts = [el("div", "wx-big", shortTime(sun.sunrise)), sunDetail];
-  if (state.weather) {
-    const c = state.weather.current;
+  const c = state.weather && [...state.weather.hourly].reverse().find(h => h.time <= now);   // the forecast for this hour
+  if (c) {
     const nowLine = el("div", "wx-detail");
     setHtml(nowLine, `Now <b>${Math.round(c.tempF)}\u00b0F</b> \u00b7 Wind <b>${Math.round(c.windMph)} mph</b> from ${COMPASS[Math.round(c.windFromDeg / 45) % 8]}`);
     parts.push(nowLine);
@@ -971,9 +1046,9 @@ function renderWeather(now) {
     setHtml(d, detail + asOf(state.weather, now));
     rainBody.replaceChildren(el("div", "wx-headline", headline), d);
     bars.replaceChildren(...hours.map(h => {
-      const bar = el("div", "rain-bar" + (h.rainPct >= RAIN_LIKELY_PCT ? " likely" : h.rainPct >= RAIN_POSSIBLE_PCT ? " possible" : ""));
+      const bar = el("div", "rain-bar" + (h.rainIn >= RAIN_HEAVY_IN ? " heavy" : h.rainIn >= RAIN_MIN_IN ? " wet" : ""));
       const fill = el("i");
-      fill.style.height = Math.max(h.rainPct, 2) + "%";
+      fill.style.height = Math.max(Math.min(h.rainIn / RAIN_BAR_FULL_IN, 1) * 100, 2) + "%";
       bar.append(fill);
       return bar;
     }));
@@ -1061,6 +1136,167 @@ function drawTideChart(day, now) {
 // Redraw the chart when its box changes size.
 new ResizeObserver(() => { if (state.shownScreen === "weather") drawTideChart(practiceDay(Date.now()), Date.now()); })
   .observe(document.getElementById("tide-chart"));
+
+// =============================================================================
+// Wind screen: the rowing course at 7, 8 and 9 AM with the wind drawn as streaks.
+// The map (data/estuary-map.json) is turned so the course runs left to right,
+// Jack London to the Pitt. Bright streaks are on the water, faint ones over land.
+// =============================================================================
+const WIND_COLORS = [[0, [70, 200, 190]], [4, [95, 211, 166]], [7, [255, 224, 138]], [11, [255, 107, 107]]];   // mph: colour
+const MAP_PAD = 48;          // map units of room around the course, for the labels
+const STREAK_SPACING = 24;   // map units between the background streaks
+const COURSE_SPACING = 20;   // map units between the streaks along the course
+
+function windColor(mph) {
+  const stops = WIND_COLORS;
+  for (let i = 1; i < stops.length; i++) {
+    if (mph > stops[i][0]) continue;
+    const [m0, c0] = stops[i - 1], [m1, c1] = stops[i], f = Math.max(0, (mph - m0) / (m1 - m0));
+    return "rgb(" + c0.map((c, k) => Math.round(c + (c1[k] - c) * f)).join(",") + ")";
+  }
+  return "rgb(" + stops[stops.length - 1][1].join(",") + ")";
+}
+
+// The same "random" numbers every time, so the streaks don't jump around between redraws.
+function seededRandom(seed) {
+  return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+}
+
+// The wind at one hour as arrows on the turned map: mph, pointing the way the air moves.
+// Returns { at(x, y), course: [{ x, y, v }] } with a course point every COURSE_SPACING units.
+function windField(map, w) {
+  const turn = map.northDeg * Math.PI / 180, cos = Math.cos(turn), sin = Math.sin(turn);
+  const vecs = map.points.map((p, i) => {
+    const a = (w.fromDeg[i] + 180) * Math.PI / 180, u = w.speedMph[i] * Math.sin(a), v = -w.speedMph[i] * Math.cos(a);
+    return [u * cos - v * sin, u * sin + v * cos];
+  });
+  const g = map.grid;
+  const at = (x, y) => {   // between the grid points
+    const fx = Math.min(Math.max((x - g.x0) / g.step, 0), g.nx - 1.001), fy = Math.min(Math.max((y - g.y0) / g.step, 0), g.ny - 1.001);
+    const i = Math.floor(fx), j = Math.floor(fy), a = fx - i, b = fy - j;
+    const p = (di, dj) => vecs[(j + dj) * g.nx + i + di];
+    return [0, 1].map(k => p(0, 0)[k] * (1 - a) * (1 - b) + p(1, 0)[k] * a * (1 - b) + p(0, 1)[k] * (1 - a) * b + p(1, 1)[k] * a * b);
+  };
+  const first = g.nx * g.ny, samples = map.points.slice(first), gap = map.courseStep;
+  const course = [];
+  for (let d = 0; d <= (samples.length - 1) * gap; d += COURSE_SPACING) {
+    const i = Math.min(Math.floor(d / gap), samples.length - 2), f = d / gap - i;
+    const mix = (a, b) => a + (b - a) * f, p = samples[i], q = samples[i + 1], pv = vecs[first + i], qv = vecs[first + i + 1];
+    course.push({ x: mix(p.x, q.x), y: mix(p.y, q.y), v: [mix(pv[0], qv[0]), mix(pv[1], qv[1])] });
+  }
+  return { at, course };
+}
+
+// One streak: a line along the wind, centred on (x, y), with an arrowhead. Longer when windier.
+function streakPath(x, y, v, head) {
+  const mph = Math.hypot(v[0], v[1]) || 0.001, dx = v[0] / mph, dy = v[1] / mph, half = (3 + mph * 1.1) * 3;
+  const x2 = x + dx * half, y2 = y + dy * half, f = n => n.toFixed(1);
+  const barb = a => f(x2 - head * (dx * Math.cos(a) - dy * Math.sin(a))) + "," + f(y2 - head * (dx * Math.sin(a) + dy * Math.cos(a)));
+  return `M${f(x - dx * half)},${f(y - dy * half)}L${f(x2)},${f(y2)}M${barb(0.5)}L${f(x2)},${f(y2)}L${barb(-0.5)}`;
+}
+
+// Range of wind along the course at one hour: { low, high, gust, from }.
+function courseWind(map, w) {
+  const first = map.grid.nx * map.grid.ny, speeds = w.speedMph.slice(first);
+  let east = 0, north = 0;
+  w.fromDeg.slice(first).forEach((deg, i) => { east += speeds[i] * Math.sin(deg * Math.PI / 180); north += speeds[i] * Math.cos(deg * Math.PI / 180); });
+  const from = (Math.atan2(east, north) * 180 / Math.PI + 360) % 360;
+  return { low: Math.round(Math.min(...speeds)), high: Math.round(Math.max(...speeds)), gust: Math.max(...w.gustMph.slice(first)), from: COMPASS[Math.round(from / 45) % 8] };
+}
+
+let windClipId = 0;
+function drawWindMap(host, map, w, withLabels) {
+  const W = host.clientWidth, H = host.clientHeight;
+  if (!W || !H) return;
+  // Fit the course (plus room for labels) in the box; any spare room shows more of the map.
+  const [bx0, by0, bx1, by1] = map.courseBox;
+  const unit = Math.max((bx1 - bx0 + 2 * MAP_PAD) / W, (by1 - by0 + 2 * MAP_PAD) / H);   // map units per pixel
+  const vw = W * unit, vh = H * unit, vx = (bx0 + bx1) / 2 - vw / 2, vy = (by0 + by1) / 2 - vh / 2;
+  const root = svg("svg", { viewBox: `${vx} ${vy} ${vw} ${vh}`, "aria-hidden": "true" });
+  const water = map.water.map(poly => "M" + poly.map(q => q.join(",")).join("L") + "Z").join("");
+  const clipId = "wind-water-" + (++windClipId);
+  const clip = svg("clipPath", { id: clipId });
+  clip.append(svg("path", { d: water, "clip-rule": "evenodd" }));
+  root.append(clip, svg("path", { d: water, fill: "#17345a", "fill-rule": "evenodd" }));
+
+  const field = windField(map, w), head = 3.2 * unit;
+  const byColour = () => new Map();
+  const add = (group, mph, d) => { const c = windColor(Math.round(mph)); group.set(c, (group.get(c) || "") + d); };
+  const everywhere = byColour(), onWater = byColour(), onCourse = byColour();
+  const g = map.grid, rand = seededRandom(7);
+  for (let gy = g.y0; gy <= g.y0 + (g.ny - 1) * g.step; gy += STREAK_SPACING) {
+    for (let gx = g.x0; gx <= g.x0 + (g.nx - 1) * g.step; gx += STREAK_SPACING) {
+      const x = gx + (rand() - 0.5) * 20, y = gy + (rand() - 0.5) * 20;
+      if (x < vx - 40 || x > vx + vw + 40 || y < vy - 40 || y > vy + vh + 40) continue;
+      const v = field.at(x, y), mph = Math.hypot(v[0], v[1]), d = streakPath(x, y, v, head);
+      add(everywhere, mph, d);
+      if (!field.course.some(c => (c.x - x) ** 2 + (c.y - y) ** 2 < 18 * 18)) add(onWater, mph, d);   // keep the course clear
+    }
+  }
+  for (const c of field.course) add(onCourse, Math.hypot(c.v[0], c.v[1]), streakPath(c.x, c.y, c.v, head * 1.3));
+  const layer = (group, width, opacity, attrs = {}) => {
+    const el = svg("g", { fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": width * unit, opacity, ...attrs });
+    for (const [colour, d] of group) el.append(svg("path", { d, stroke: colour }));
+    return el;
+  };
+  root.append(layer(everywhere, 0.8, 0.22), layer(onWater, 1.4, 0.8, { "clip-path": `url(#${clipId})` }), layer(onCourse, 1.9, 1));
+
+  const font = Math.max(11, Math.min(innerWidth, innerHeight) * 0.021) * unit;
+  for (const m of map.landmarks) {
+    if (m.marker === "home") root.append(svg("circle", { cx: m.x, cy: m.y, r: 4.5 * unit, fill: "#4da3ff", stroke: "#0b1220", "stroke-width": unit }));
+    if (m.marker === "ring") root.append(svg("circle", { cx: m.x, cy: m.y, r: 4.5 * unit, fill: "#101a2e", stroke: "#f2f6ff", "stroke-width": 1.6 * unit }));
+    if (withLabels && W >= 420) {
+      root.append(svg("text", { x: m.x + m.label[0], y: m.y + m.label[1], "text-anchor": m.label[2], "font-size": font,
+        "stroke-width": font * 0.28, fill: m.marker === "home" ? "#4da3ff" : "#c9d6ea" }, m.name));
+    }
+  }
+  if (withLabels) {   // which way is north on the turned map
+    const turn = map.northDeg * Math.PI / 180, nx = Math.sin(turn), ny = -Math.cos(turn);
+    const r = 11 * unit, cx = vx + vw - 2.4 * r, cy = vy + 2.6 * r, f = n => n.toFixed(1);
+    const tipX = cx + nx * r * 0.62, tipY = cy + ny * r * 0.62, barb = side => f(tipX - r * 0.5 * (nx * 0.8 - side * ny * 0.6)) + "," + f(tipY - r * 0.5 * (ny * 0.8 + side * nx * 0.6));
+    root.append(svg("circle", { cx, cy, r, fill: "#141e33", stroke: "#8da2c0", "stroke-width": unit }),
+      svg("path", { d: `M${f(cx - nx * r * 0.62)},${f(cy - ny * r * 0.62)}L${f(tipX)},${f(tipY)}M${barb(1)}L${f(tipX)},${f(tipY)}L${barb(-1)}`,
+        fill: "none", stroke: "#f2f6ff", "stroke-width": 1.6 * unit, "stroke-linecap": "round", "stroke-linejoin": "round" }),
+      svg("text", { x: cx + nx * 1.7 * r, y: cy + ny * 1.7 * r + font * 0.3, "text-anchor": "middle", "font-size": font * 0.85, "stroke-width": font * 0.25, fill: "#8da2c0" }, "N"));
+  }
+  host.replaceChildren(root);
+}
+
+let windDrawn = "";   // what the wind page currently shows, so it's only redrawn when something changed
+function renderWind(now) {
+  const host = document.getElementById("wind");
+  const wx = state.weather, map = state.map;
+  if (!wx || !map || wx.points !== map.points.length) {
+    const failed = state.weatherFailed || !!(wx && map);
+    if (windDrawn !== "message " + failed) host.replaceChildren(messageFor(failed, "Wind forecast"));
+    windDrawn = "message " + failed;
+    return;
+  }
+  const day = practiceDay(now);
+  const key = [wx.run, day.month, day.day, sameDay(atMinutes(day, 0), now), host.clientWidth, host.clientHeight].join(" ");
+  if (key === windDrawn) return;
+  windDrawn = key;
+  const rows = WIND_ROW_HOURS.map(hour => {
+    const time = atMinutes(day, hour * 60), w = wx.wind.find(x => x.time === time);
+    const title = el("div", "wind-hour", hourTime(time));
+    if (!sameDay(time, now)) title.append(" ", el("small", "", "tomorrow"));
+    const info = el("div", "wind-info"), mapBox = el("div", "wind-map"), row = el("div", "wind-row");
+    info.append(title);
+    if (w) {
+      const c = courseWind(map, w);
+      const speed = el("div", "wind-speed", c.low === c.high ? String(c.high) : `${c.low}–${c.high}`);
+      speed.style.color = windColor(c.high);
+      speed.append(el("small", "", " mph"));
+      info.append(speed, el("div", "wind-detail", `from ${c.from} · gusts ${c.gust}`));
+    } else {
+      info.append(el("div", "wind-detail", "No forecast yet"));
+    }
+    row.append(info, mapBox);
+    return { row, mapBox, w };
+  });
+  host.replaceChildren(...rows.map(r => r.row));
+  rows.forEach((r, i) => { if (r.w) drawWindMap(r.mapBox, map, r.w, i === 0); });
+}
 
 // =============================================================================
 // Fitting: CSS sizes the numbers; this only corrects what CSS can't know
@@ -1290,10 +1526,14 @@ function every(ms, job) {
 
 function tickClock() {
   document.getElementById("clock").textContent = formatTime(new Date(), false);
-  if (activeScreen() !== state.shownScreen) render();   // schedule or a manual switch changed the screen
+  // The schedule, a manual switch or the weather pages' turn changed what's showing.
+  if (activeScreen() !== state.shownScreen || (state.shownScreen === "weather" && weatherPage() !== state.shownPage)) render();
 }
 
 document.getElementById("screen-toggle").addEventListener("click", toggleScreen);
+document.getElementById("weather").addEventListener("click", togglePage);
+document.getElementById("wind").addEventListener("click", togglePage);
+addEventListener("resize", () => { if (state.shownScreen === "weather") render(); });
 
 setSplit(savedSplit(), false);
 every(1000, tickClock);
