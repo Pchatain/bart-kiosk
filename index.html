@@ -327,7 +327,7 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 28vw;
+    grid-template-columns: minmax(0, 1fr) 23vw;
     gap: 1.5vmin;
     padding: 0 2vw 1vmin;
   }
@@ -339,7 +339,11 @@
   #wind-side .wx-headline { font-size: 3.1vmin; margin-top: 0.8vmin; }
   #wind-side .wx-detail { font-size: 2.3vmin; }
   #wind-side .wx-message { font-size: 2.4vmin; }
-  #wind-side .tide-chart { min-height: 8vmin; }
+  #wind-side .tide-chart { display: none; }
+  #wind-side .side-heights { font-size: 5.2vmin; font-weight: 800; line-height: 1.1; margin: 1.2vmin 0 0.4vmin; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #wind-side .side-heights small { font-size: 2.3vmin; font-weight: 400; color: var(--muted); }
+  #side-tide-next { margin-top: auto; }
+  #side-tide-next span { display: block; white-space: nowrap; }
   .wind-row {
     background: var(--panel);
     border-radius: 1.5vmin;
@@ -1299,20 +1303,21 @@ let windDrawn = "";   // what the wind page currently shows, so it's only redraw
 function renderWindSide(now) {
   const day = practiceDay(now);
   const start = atMinutes(day, PRACTICE_HOURS.from), end = atMinutes(day, PRACTICE_HOURS.until);
-  document.getElementById("side-tide-label").textContent = `Tides \u00b7 ${sameDay(start, now) ? "today" : "tomorrow"} ${shortTime(start)}\u2013${shortTime(end)}`;
+  document.getElementById("side-tide-label").textContent = `Tides \u00b7 practice ${sameDay(start, now) ? "today" : "tomorrow"}`;
   const tideBody = document.getElementById("side-tide-body"), tideNext = document.getElementById("side-tide-next");
   if (state.tides && state.tides.curve.length) {
     const { headline, detail } = tideSummary(state.tides, start, end);
-    const d = el("div", "wx-detail");
-    setHtml(d, detail + asOf(state.tides, now));
-    tideBody.replaceChildren(el("div", "wx-headline", headline), d);
-    setHtml(tideNext, "Next: " + state.tides.events.filter(e => e.time >= now).slice(0, 2).map(e =>
-      `<span>${e.type === "high" ? "High" : "Low"} <b>${shortTime(e.time)}</b> ${feet(e.ft)}</span>`).join(" \u00b7 "));
+    const h1 = tideAt(state.tides.curve, start), h2 = tideAt(state.tides.curve, end);
+    const heights = el("div", "side-heights");
+    if (h1 !== null && h2 !== null) setHtml(heights, `${h1.toFixed(1)} \u2192 ${h2.toFixed(1)}<small> ft</small>`);
+    const d = el("div", "wx-detail", `${shortTime(start)} to ${shortTime(end)}` + asOf(state.tides, now));
+    tideBody.replaceChildren(el("div", "wx-headline", headline), heights, d);
+    setHtml(tideNext, state.tides.events.filter(e => e.time >= now).slice(0, 3).map(e =>
+      `<span>${e.type === "high" ? "High" : "Low"} <b>${shortTime(e.time)}</b> ${feet(e.ft)}</span>`).join(""));
   } else {
     tideBody.replaceChildren(messageFor(state.tidesFailed, "Tides"));
     tideNext.textContent = "";
   }
-  drawTideChart(day, now, document.getElementById("side-tide-chart"), true);
 
   const rainBody = document.getElementById("side-rain-body");
   if (state.weather) {
