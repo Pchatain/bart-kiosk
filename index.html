@@ -327,10 +327,19 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-auto-rows: 1fr;
+    grid-template-columns: minmax(0, 1fr) 28vw;
     gap: 1.5vmin;
     padding: 0 2vw 1vmin;
   }
+  #wind-rows { display: grid; grid-auto-rows: 1fr; gap: 1.5vmin; min-height: 0; min-width: 0; }
+  #wind-side { display: flex; flex-direction: column; gap: 1.5vmin; min-height: 0; min-width: 0; }
+  #wind-side .wx-card { padding: 1.2vmin 1.2vw; }
+  #wind-side .wx-tides { flex: 1; }
+  #wind-side .wx-label { font-size: 2.1vmin; }
+  #wind-side .wx-headline { font-size: 3.1vmin; margin-top: 0.8vmin; }
+  #wind-side .wx-detail { font-size: 2.3vmin; }
+  #wind-side .wx-message { font-size: 2.4vmin; }
+  #wind-side .tide-chart { min-height: 8vmin; }
   .wind-row {
     background: var(--panel);
     border-radius: 1.5vmin;
@@ -340,23 +349,23 @@
     overflow: hidden;
   }
   .wind-info {
-    flex: 0 0 31vmin;
-    padding: 1vmin 1.5vw;
+    flex: 0 0 25vmin;
+    padding: 1vmin 1.2vw;
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-width: 0;
     white-space: nowrap;
   }
-  .wind-hour { font-size: 5vmin; font-weight: 800; line-height: 1.1; }
+  .wind-hour { font-size: 4.2vmin; font-weight: 800; line-height: 1.1; }
   .wind-hour small { font-size: 2.4vmin; font-weight: 400; color: var(--muted); }
-  .wind-speed { font-size: 5.4vmin; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
-  .wind-speed small { font-size: 2.6vmin; font-weight: 400; color: var(--muted); }
-  .wind-detail { font-size: 2.5vmin; color: var(--muted); }
+  .wind-speed { font-size: 4.6vmin; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .wind-speed small { font-size: 2.3vmin; font-weight: 400; color: var(--muted); }
+  .wind-detail { font-size: 2.2vmin; color: var(--muted); }
   .wind-map { flex: 1; min-width: 0; min-height: 0; position: relative; background: #101a2e; }
   .wind-map svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .wind-map text { font-weight: 700; paint-order: stroke; stroke: #101a2e; stroke-linejoin: round; }
-  #wind > .wx-message { padding: 2vmin 1vw; }
+  #wind-rows > .wx-message { padding: 2vmin 1vw; }
 
   /* Portrait screens: stack the platforms; the divider drags up and down. */
   @media (orientation: portrait) {
@@ -367,6 +376,10 @@
     #divider::after { width: 9vmin; height: 0.5vmin; }
     #weather { grid-template-columns: 1fr; grid-template-rows: 1.4fr auto auto; }
     .wx-tides { grid-row: auto; }
+    #wind { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    #wind-side { flex-direction: row; }
+    #wind-side .wx-card { flex: 1; }
+    #wind-side .tide-chart { display: none; }
     .wind-row { flex-direction: column; }
     .wind-info { flex: none; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 1.2em; }
   }
@@ -421,7 +434,24 @@
       <div class="rain-hours" id="rain-hours"></div>
     </div>
   </section>
-  <section id="wind" hidden aria-label="Wind along the rowing course"></section>
+  <section id="wind" hidden aria-label="Wind along the rowing course, tides and rain">
+    <div id="wind-rows"></div>
+    <aside id="wind-side">
+      <div class="wx-card wx-tides">
+        <div class="wx-label" id="side-tide-label">Tides during practice</div>
+        <div id="side-tide-body"></div>
+        <div class="tide-chart" id="side-tide-chart"></div>
+        <div class="wx-detail" id="side-tide-next"></div>
+      </div>
+      <div class="wx-card">
+        <div class="wx-label">Rain &middot; next 24 hours</div>
+        <div id="side-rain-body"></div>
+      </div>
+      <div class="wx-card">
+        <div class="wx-detail" id="side-sun"></div>
+      </div>
+    </aside>
+  </section>
   <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
     <div id="footer-note">Departures within the next 60 minutes</div>
@@ -1072,14 +1102,14 @@ function svg(tag, attrs, text) {
   return e;
 }
 
-function drawTideChart(day, now) {
-  const host = document.getElementById("tide-chart");
+// `compact` (the narrow chart beside the wind maps): smaller type, an hour label every two hours, shorter event labels.
+function drawTideChart(day, now, host = document.getElementById("tide-chart"), compact = false) {
   const W = host.clientWidth, H = host.clientHeight;
   if (!W || !H || !state.tides) { host.replaceChildren(); return; }
   const t0 = atMinutes(day, TIDE_CHART_HOURS.from), t1 = atMinutes(day, TIDE_CHART_HOURS.until);
   const points = state.tides.curve.filter(p => p.time >= t0 && p.time <= t1);
   if (points.length < 2) { host.replaceChildren(); return; }
-  const font = Math.min(innerWidth, innerHeight) * 0.024;
+  const font = Math.min(innerWidth, innerHeight) * (compact ? 0.02 : 0.024);
   // Room above for labels on highs, below for labels on lows and the hour labels.
   const pad = { l: font * 3.2, r: font * 0.5, t: font * 2.4, b: font * 3.6 };
   const lo = Math.min(...points.map(p => p.ft)) - 0.4, hi = Math.max(...points.map(p => p.ft)) + 0.4;
@@ -1093,7 +1123,7 @@ function drawTideChart(day, now) {
   out.append(svg("rect", { x: x(ps), y: pad.t, width: x(pe) - x(ps), height: H - pad.t - pad.b, fill: "rgba(77,163,255,0.14)", rx: font * 0.3 }));
   // Label at the bottom of the band, or the top if a low tide's label is down there.
   const lowInPractice = state.tides.events.some(e => e.type === "low" && e.time >= ps && e.time <= pe);
-  out.append(svg("text", { x: (x(ps) + x(pe)) / 2, y: lowInPractice ? pad.t + font * 1.2 : H - pad.b - font * 0.5,
+  if (!compact) out.append(svg("text", { x: (x(ps) + x(pe)) / 2, y: lowInPractice ? pad.t + font * 1.2 : H - pad.b - font * 0.5,
     fill: accent, "text-anchor": "middle", "font-weight": 700 }, "Practice"));
 
   // Height gridlines (whole feet)
@@ -1105,7 +1135,7 @@ function drawTideChart(day, now) {
 
   // Hour labels
   // Hour labels, leaving out the two ends so nothing crowds the edges.
-  for (let m = TIDE_CHART_HOURS.from + 60; m < TIDE_CHART_HOURS.until; m += 60) {
+  for (let m = TIDE_CHART_HOURS.from + 60; m < TIDE_CHART_HOURS.until; m += compact ? 120 : 60) {
     const h = m / 60;
     out.append(svg("text", { x: x(atMinutes(day, m)), y: H - font * 0.4, fill: muted, "text-anchor": "middle" }, (h % 12 || 12) + (h < 12 ? " AM" : " PM")));
   }
@@ -1122,7 +1152,7 @@ function drawTideChart(day, now) {
     out.append(svg("circle", { cx: ex, cy: ey, r: font * 0.35, fill: "#f2f6ff" }));
     const anchor = ex < W * 0.2 ? "start" : ex > W * 0.8 ? "end" : "middle";
     out.append(svg("text", { x: ex, y: above ? ey - font * 0.8 : ey + font * 1.6, fill: "#f2f6ff", "text-anchor": anchor, "font-weight": 700 },
-      `${above ? "High" : "Low"} ${shortTime(e.time)} \u00b7 ${feet(e.ft)}`));
+      `${above ? "High" : "Low"} ${shortTime(e.time)}` + (compact ? "" : ` \u00b7 ${feet(e.ft)}`)));
   }
 
   // Now
@@ -1136,6 +1166,8 @@ function drawTideChart(day, now) {
 // Redraw the chart when its box changes size.
 new ResizeObserver(() => { if (state.shownScreen === "weather") drawTideChart(practiceDay(Date.now()), Date.now()); })
   .observe(document.getElementById("tide-chart"));
+new ResizeObserver(() => { if (state.shownPage === "wind") renderWindSide(Date.now()); })
+  .observe(document.getElementById("side-tide-chart"));
 
 // =============================================================================
 // Wind screen: the rowing course at 7, 8 and 9 AM with the wind drawn as streaks.
@@ -1263,8 +1295,43 @@ function drawWindMap(host, map, w, withLabels) {
 }
 
 let windDrawn = "";   // what the wind page currently shows, so it's only redrawn when something changed
+// Beside the wind maps: tides during practice, rain in a line, and sunrise.
+function renderWindSide(now) {
+  const day = practiceDay(now);
+  const start = atMinutes(day, PRACTICE_HOURS.from), end = atMinutes(day, PRACTICE_HOURS.until);
+  document.getElementById("side-tide-label").textContent = `Tides \u00b7 ${sameDay(start, now) ? "today" : "tomorrow"} ${shortTime(start)}\u2013${shortTime(end)}`;
+  const tideBody = document.getElementById("side-tide-body"), tideNext = document.getElementById("side-tide-next");
+  if (state.tides && state.tides.curve.length) {
+    const { headline, detail } = tideSummary(state.tides, start, end);
+    const d = el("div", "wx-detail");
+    setHtml(d, detail + asOf(state.tides, now));
+    tideBody.replaceChildren(el("div", "wx-headline", headline), d);
+    setHtml(tideNext, "Next: " + state.tides.events.filter(e => e.time >= now).slice(0, 2).map(e =>
+      `<span>${e.type === "high" ? "High" : "Low"} <b>${shortTime(e.time)}</b> ${feet(e.ft)}</span>`).join(" \u00b7 "));
+  } else {
+    tideBody.replaceChildren(messageFor(state.tidesFailed, "Tides"));
+    tideNext.textContent = "";
+  }
+  drawTideChart(day, now, document.getElementById("side-tide-chart"), true);
+
+  const rainBody = document.getElementById("side-rain-body");
+  if (state.weather) {
+    const { headline, detail } = rainSummary(state.weather.hourly, now);
+    const d = el("div", "wx-detail");
+    setHtml(d, detail + asOf(state.weather, now));
+    rainBody.replaceChildren(el("div", "wx-headline", headline), d);
+  } else {
+    rainBody.replaceChildren(messageFor(state.weatherFailed, "Forecast"));
+  }
+
+  const sun = sunTimes(day), c = state.weather && [...state.weather.hourly].reverse().find(h => h.time <= now);
+  setHtml(document.getElementById("side-sun"), `Sunrise <b>${shortTime(sun.sunrise)}</b> \u00b7 first light <b>${shortTime(sun.firstLight)}</b>` +
+    (c ? `<br>Now <b>${Math.round(c.tempF)}\u00b0F</b>` : ""));
+}
+
 function renderWind(now) {
-  const host = document.getElementById("wind");
+  renderWindSide(now);
+  const host = document.getElementById("wind-rows");
   const wx = state.weather, map = state.map;
   if (!wx || !map || wx.points !== map.points.length) {
     const failed = state.weatherFailed || !!(wx && map);
