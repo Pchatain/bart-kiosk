@@ -1,5 +1,6 @@
 // Shared helpers for the layout tests: fake BART data, opening the board, and
 // a geometry check that reports anything clipped, overlapping or cut off.
+const fs = require("fs");
 const path = require("path");
 
 const PAGE_URL = "file://" + path.resolve(__dirname, "..", "index.html");
@@ -47,16 +48,27 @@ const ADVISORY = { root: { bsa: [{ station: "", description: { "#cdata-section":
 // Noon on a Monday, Bay Area time: the train screen is showing.
 const NOON = "2026-11-02T20:00:00Z";
 
-// Open-Meteo forecast response for 72 hours from `startMs`. rainPct(hourIndex, ms) gives each hour's chance.
-function openMeteoFixture(startMs, rainPct = () => 0, rainIn = () => 0) {
-  const hours = [...Array(72).keys()].map(i => startMs + i * 3600000);
+// The course map the page loads (the real file) and a forecast in the format of
+// data/estuary-wind.json: 48 hours from `startMs`. rainIn(hourIndex) is the rain during
+// each hour; wind(pointIndex, hourOfDay) gives { mph, from } at each map point.
+const ESTUARY_MAP = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "data", "estuary-map.json"), "utf8"));
+const laHour = ms => Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hourCycle: "h23" }).format(ms)) % 24;
+
+function woofFixture(startMs, rainIn = () => 0, wind = () => ({ mph: 5, from: 90 })) {
+  const hours = [...Array(49).keys()].map(i => startMs + i * 3600000);
+  const points = ESTUARY_MAP.points.map((p, i) => i);
   return {
-    current: { time: startMs / 1000, temperature_2m: 54.3, wind_speed_10m: 7.8, wind_direction_10m: 270 },
-    hourly: {
+    source: "WOOF, Recast", forecast: "test", run: "run_test_" + startMs, init: new Date(startMs).toISOString(), points: points.length,
+    boathouse: {
       time: hours.map(t => t / 1000),
-      precipitation_probability: hours.map((t, i) => rainPct(i, t)),
-      precipitation: hours.map((t, i) => rainIn(i, t))
-    }
+      tempF: hours.map(() => 54), windMph: hours.map(() => 7.8), windFromDeg: hours.map(() => 270), gustMph: hours.map(() => 12),
+      rainIn: hours.map((t, i) => (i === 0 ? null : rainIn(i - 1))),   // WOOF: the total over the hour before each time
+      visibilityMi: hours.map(() => 10), lowCloudPct: hours.map(() => 0)
+    },
+    wind: hours.filter(t => laHour(t) >= 5 && laHour(t) <= 10).map(t => {
+      const at = points.map(i => wind(i, laHour(t)));
+      return { time: t / 1000, speedMph: at.map(w => w.mph), fromDeg: at.map(w => w.from), gustMph: at.map(w => Math.round(w.mph + 3)) };
+    })
   };
 }
 
@@ -82,18 +94,18 @@ function json(body, status = 200) {
 // Opens the board with fake BART responses. `departures` may be a function
 // (called per request) to change the data or fail between refreshes.
 // `time`: what the page's clock says (default: noon, trains). Pass null if the
-// test installed its own clock. `weather`/`tides`: responses, or a status code to fail.
+// test installed its own clock. `weather` (a woofFixture) / `tides`: responses, or a status code to fail.
 async function openBoard(page, { etd = SCENARIOS.normal, bsa = NO_ADVISORIES, query = "", departures, time = NOON, weather, tides } = {}) {
   if (time !== null) await page.clock.setFixedTime(new Date(time));
   const now = time !== null ? Date.parse(time) : Date.parse(NOON);
   const hourStart = now - (now % 3600000);
-  const wx = weather === undefined ? openMeteoFixture(hourStart) : weather;
+  const wx = weather === undefined ? woofFixture(hourStart) : weather;
   const td = tides === undefined ? noaaFixture(Date.parse("2026-11-02T15:44:00Z")) : tides;
   await page.route("https://api.bart.gov/api/etd.aspx**", route =>
     route.fulfill(departures ? departures() : json({ root: { station: [{ etd }] } })));
   await page.route("https://api.bart.gov/api/bsa.aspx**", route => route.fulfill(json(bsa)));
-  await page.route("https://api.open-meteo.com/**", route =>
-    route.fulfill(typeof wx === "number" ? json({ error: true }, wx) : json(wx)));
+  await page.route("https://raw.githubusercontent.com/**", route =>
+    route.fulfill(typeof wx === "number" ? json({ error: true }, wx) : json(route.request().url().endsWith("estuary-map.json") ? ESTUARY_MAP : wx)));
   await page.route("https://api.tidesandcurrents.noaa.gov/**", route =>
     route.fulfill(typeof td === "number" ? json({ error: true }, td) : json(route.request().url().includes("interval=hilo") ? td.hilo : td.curve)));
   await page.goto(PAGE_URL + query);
@@ -156,4 +168,4 @@ async function columnSummary(page) {
 }
 
 module.exports = { PAGE_URL, SCENARIOS, NO_ADVISORIES, ADVISORY, NOON, json, est, openBoard, layoutProblems, columnSummary,
-  openMeteoFixture, noaaFixture, ORANGE, BLUE };
+  woofFixture, ESTUARY_MAP, noaaFixture, ORANGE, BLUE };

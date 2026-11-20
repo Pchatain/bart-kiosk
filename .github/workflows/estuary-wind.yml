@@ -1,0 +1,40 @@
+name: Estuary wind data
+
+# Fetches the WOOF wind forecast for the rowing course and saves it in
+# data/estuary-wind.json, which the kiosk's weather screen reads.
+# WOOF starts a new forecast twice a day, so most runs change nothing and
+# commit nothing.
+on:
+  schedule:
+    - cron: "17 * * * *"   # every hour, off the busy top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: estuary-wind
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch the forecast
+        run: node .github/scripts/fetch-estuary-wind.mjs
+      - name: Commit the data if it changed
+        run: |
+          git add data/estuary-wind.json
+          if git diff --cached --quiet; then
+            echo "No change."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update estuary wind forecast"
+          git pull --rebase
+          git push
