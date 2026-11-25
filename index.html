@@ -53,7 +53,7 @@
   #screen-toggle svg { width: 100%; height: 100%; display: block; }
   #screen-toggle .to-trains, body.show-weather #screen-toggle .to-weather { display: none; }
   body.show-weather #screen-toggle .to-trains { display: block; }
-  main[hidden], #weather[hidden], #wind[hidden] { display: none; }
+  main[hidden], #weather[hidden] { display: none; }
   body.show-weather #ticker { display: none; }
   #clock {
     font-size: 4.5vmin;
@@ -263,73 +263,41 @@
   #status.problem { color: #ff8a80; }
   #version { margin-left: 1em; opacity: 0.6; }
 
-  /* ---- Weather screen ---- */
+  /* ---- Weather screen: a strip of numbers (tide, rain, sunrise, now), then the wind maps ---- */
   #weather {
     flex: 1;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    grid-template-rows: auto 1fr;
-    gap: 2vmin;
-    padding: 0 2vw 1vmin;
-  }
-  .wx-card {
-    background: var(--panel);
-    border-radius: 1.5vmin;
-    padding: 1.5vmin 1.5vw;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    gap: 1.5vmin;
+    padding: 0 2vw 1vmin;
+  }
+  #wx-strip { display: flex; gap: 1.2vmin; }
+  /* Each tile is as wide as its text needs, plus an equal share of the spare room. */
+  .wx-tile {
+    flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
-  }
-  .wx-tides { grid-row: 1 / span 2; }
-  .wx-label {
-    font-size: 2.8vmin;
-    font-weight: 700;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding-bottom: 0.6vmin;
-    border-bottom: 2px solid rgba(255,255,255,0.12);
+    background: var(--panel);
+    border-radius: 1.5vmin;
+    padding: 0.8vmin 1.2vmin 1vmin;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .wx-headline { font-size: 4.4vmin; font-weight: 800; margin-top: 1vmin; line-height: 1.15; }
-  .wx-detail { font-size: 2.8vmin; color: var(--muted); margin-top: 0.6vmin; line-height: 1.3; }
-  .wx-detail b { color: var(--text); font-weight: 700; }
-  .wx-big { font-size: 9vmin; font-weight: 800; line-height: 1; margin-top: 1vmin; font-variant-numeric: tabular-nums; }
-  .wx-message { font-size: 3vmin; color: var(--muted); margin-top: 1.5vmin; }
-  .wx-message.problem { color: #ff8a80; }
-  .tide-chart { flex: 1; min-height: 12vmin; margin-top: 1vmin; position: relative; }
-  .tide-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .tide-events { font-size: 2.6vmin; color: var(--muted); margin-top: 0.8vmin; line-height: 1.4; }
-  .tide-events b { color: var(--text); }
-  .tide-events span { white-space: nowrap; }
-  .rain-bars {
-    flex: 1;
-    min-height: 6vmin;
-    display: flex;
-    align-items: stretch;
-    gap: 0.25vw;
-    margin-top: 1.2vmin;
-  }
-  .rain-bar { flex: 1; display: flex; align-items: flex-end; background: rgba(77,163,255,0.08); border-radius: 0.4vmin 0.4vmin 0 0; }
-  .rain-bar i { display: block; width: 100%; border-radius: 0.4vmin 0.4vmin 0 0; background: rgba(77,163,255,0.35); }
-  .rain-bar.wet i { background: rgba(77,163,255,0.7); }
-  .rain-bar.heavy i { background: #4da3ff; }
-  .rain-hours { display: flex; gap: 0.25vw; font-size: 2vmin; color: var(--muted); margin-top: 0.4vmin; }
-  .rain-hours span { flex: 1; white-space: nowrap; overflow: visible; }
+  .wx-tile > div { overflow: hidden; text-overflow: ellipsis; }
+  .wx-label { font-size: 2.1vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .wx-value { font-size: 5.4vmin; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .wx-value small { font-size: 2.6vmin; font-weight: 400; color: var(--muted); }
+  .wx-value.heavy { color: var(--accent); }
+  .wx-detail { font-size: 2.25vmin; color: var(--muted); }
+  .wx-detail.problem, .wx-message.problem { color: #ff8a80; }
+  .wx-message { font-size: 3vmin; color: var(--muted); }
 
-  /* ---- Wind screen: one row per hour, the course drawn left to right ---- */
+  /* ---- Wind: one row per hour, the course drawn left to right ---- */
   #wind {
     flex: 1;
     min-height: 0;
     display: grid;
     grid-auto-rows: 1fr;
     gap: 1.5vmin;
-    padding: 0 2vw 1vmin;
   }
   .wind-row {
     background: var(--panel);
@@ -365,8 +333,7 @@
     #divider { margin: 1.2vmin 0; cursor: row-resize; }
     #divider::before { left: 0; right: 0; top: -2.5vmin; bottom: -2.5vmin; }
     #divider::after { width: 9vmin; height: 0.5vmin; }
-    #weather { grid-template-columns: 1fr; grid-template-rows: 1.4fr auto auto; }
-    .wx-tides { grid-row: auto; }
+    #wx-strip { display: grid; grid-template-columns: 1fr 1fr; }
     .wind-row { flex-direction: column; }
     .wind-info { flex: none; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 1.2em; }
   }
@@ -403,31 +370,21 @@
       </div>
     </section>
   </main>
-  <section id="weather" hidden aria-label="Weather and tides">
-    <div class="wx-card wx-tides">
-      <div class="wx-label" id="tide-label">Tides during practice</div>
-      <div id="tide-body"><div class="wx-message">Loading tides&hellip;</div></div>
-      <div class="tide-chart" id="tide-chart"></div>
-      <div class="tide-events" id="tide-events"></div>
+  <section id="weather" hidden aria-label="Weather, tides and wind">
+    <div id="wx-strip">
+      <div class="wx-tile" id="tile-tide"><div class="wx-label">Tide</div><div class="wx-value">&ndash;</div><div class="wx-detail">Loading&hellip;</div></div>
+      <div class="wx-tile" id="tile-rain"><div class="wx-label">Rain &middot; next 24 hr</div><div class="wx-value">&ndash;</div><div class="wx-detail">Loading&hellip;</div></div>
+      <div class="wx-tile" id="tile-sun"><div class="wx-label">Sunrise</div><div class="wx-value">&ndash;</div><div class="wx-detail"></div></div>
+      <div class="wx-tile" id="tile-now"><div class="wx-label">Now</div><div class="wx-value">&ndash;</div><div class="wx-detail">Loading&hellip;</div></div>
     </div>
-    <div class="wx-card wx-sun">
-      <div class="wx-label">Sunrise</div>
-      <div id="sun-body"></div>
-    </div>
-    <div class="wx-card wx-rain">
-      <div class="wx-label">Rain &middot; next 24 hours</div>
-      <div id="rain-body"><div class="wx-message">Loading forecast&hellip;</div></div>
-      <div class="rain-bars" id="rain-bars"></div>
-      <div class="rain-hours" id="rain-hours"></div>
-    </div>
+    <div id="wind" aria-label="Wind along the rowing course"></div>
   </section>
-  <section id="wind" hidden aria-label="Wind along the rowing course"></section>
   <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v11.1</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v12</span></div>
   </footer>
 
 <script>
@@ -468,16 +425,12 @@ const WIDTH_RATIO = 1.45;                  // row width in number-font-sizes: fi
 const LOCATION = { lat: 37.78, lon: -122.24 };               // Oakland Estuary by Fruitvale
 const WEATHER_HOURS = { from: 5 * 60, until: 7 * 60 };       // show weather 5:00-7:00 AM, every day
 const PRACTICE_HOURS = { from: 6 * 60 + 30, until: 8 * 60 + 30 };
-const TIDE_CHART_HOURS = { from: 4 * 60, until: 11 * 60 };   // time range drawn on the tide chart
 const MANUAL_SWITCH_MS = 5 * 60 * 1000;                      // a tap on the icon lasts this long
-const WEATHER_PAGE_MS = 20 * 1000;                            // the weather screen alternates tides and wind this often
-const WIND_ROW_HOURS = [7, 8, 9];                             // hours shown on the wind page (the data file has 5-10 AM)
+const WIND_ROW_HOURS = [7, 8, 9];                             // hours with a wind map (the data file has 5-10 AM)
 const WEATHER_EVERY_MS = 15 * 60 * 1000;
 const TIDES_EVERY_MS = 3 * 60 * 60 * 1000;
 const RAIN_MIN_IN = 0.01;                                     // an hour with at least this much counts as rain
 const RAIN_HEAVY_IN = 0.1;                                    // inches in an hour
-const RAIN_BAR_FULL_IN = 0.2;                                 // a full-height bar on the rain chart
-const WEATHER_STALE_MS = 60 * 60 * 1000;                      // say "as of" when older than this
 
 const DEFAULT_SPLIT = 0.5;                 // Platform 1's default share of the width
 const SPLIT_KEY = "kiosk-split";
@@ -505,7 +458,7 @@ const PLATFORMS = ["1", "2"];
 // Container units (cqw/cqh) let CSS do the sizing. Older browsers get the same
 // formula computed in the script. "?nocq" in the address forces that path, for testing.
 const USE_CONTAINER_UNITS = CSS.supports("height: 1cqh") && !/[?&]nocq\b/.test(location.search);
-// "?screen=weather" (tides page), "?screen=wind" or "?screen=trains" in the address pins a screen (for testing).
+// "?screen=weather" or "?screen=trains" in the address pins a screen (for testing). "wind" is an older name for weather.
 const PINNED_SCREEN = (location.search.match(/[?&]screen=(weather|wind|trains)\b/) || [])[1] || null;
 
 // =============================================================================
@@ -518,12 +471,10 @@ const state = {
   weather: null,       // { hourly, wind, points, run, fetchedAt } from the weather provider
   weatherFailed: false,
   map: null,           // the rowing course map (data/estuary-map.json); loaded once
-  pageSince: null,     // when the weather screen started alternating its pages
   tides: null,         // { events, curve, fetchedAt } from the tide provider
   tidesFailed: false,
   manual: null,        // { screen, until } after a tap on the icon
-  shownScreen: null,
-  shownPage: null
+  shownScreen: null
 };
 
 // =============================================================================
@@ -837,26 +788,12 @@ function toggleScreen() {
   render();
 }
 
-// The weather screen has two pages, tides and wind, that take turns. A tap on the page switches.
-function weatherPage(now = Date.now()) {
-  if (PINNED_SCREEN) return PINNED_SCREEN === "wind" ? "wind" : "tides";
-  if (state.pageSince === null) return "tides";
-  return Math.floor((now - state.pageSince) / WEATHER_PAGE_MS) % 2 ? "wind" : "tides";
-}
-
-function togglePage() {
-  const now = Date.now();
-  state.pageSince = weatherPage(now) === "tides" ? now - WEATHER_PAGE_MS : now;
-  render();
-}
-
-function renderScreenChrome(screen, page) {
+function renderScreenChrome(screen) {
   const weather = screen === "weather";
   document.body.classList.toggle("show-weather", weather);
   document.querySelector("main").hidden = weather;
-  document.getElementById("weather").hidden = !(weather && page === "tides");
-  document.getElementById("wind").hidden = !(weather && page === "wind");
-  document.getElementById("title-word").textContent = !weather ? "BART" : page === "wind" ? "Wind" : "Weather";
+  document.getElementById("weather").hidden = !weather;
+  document.getElementById("title-word").textContent = weather ? "Weather" : "BART";
   document.getElementById("screen-toggle").setAttribute("aria-label", weather ? "Show trains" : "Show weather");
   document.getElementById("footer-note").textContent = weather
     ? `Forecast by ${weatherProvider.name} \u00b7 Tides: ${tideProvider.name}`
@@ -883,25 +820,23 @@ function renderWeatherStatus() {
   const status = document.getElementById("status");
   const failed = state.weatherFailed || state.tidesFailed;
   status.classList.toggle("problem", failed);
-  status.textContent = failed ? "Weather update failed \u2014 retrying"
+  status.textContent = failed && state.weather ? "Weather from " + formatTime(new Date(state.weather.fetchedAt), false) + " \u2014 retrying"
+    : failed ? "Weather update failed \u2014 retrying"
     : state.weather ? "Weather updated " + formatTime(new Date(state.weather.fetchedAt), false)
     : "Updating\u2026";
 }
 
 function render() {
   const screen = activeScreen();
-  if (screen === "weather" && state.shownScreen !== "weather") state.pageSince = Date.now();
-  const page = screen === "weather" ? weatherPage() : null;
   state.shownScreen = screen;
-  state.shownPage = page;
-  renderScreenChrome(screen, page);
+  renderScreenChrome(screen);
   const trains = currentTrains();
   if (trains) renderBoard(trains);
   setTicker(tickerMessages(trains));
   renderStatus();
   if (screen === "weather") {
     renderWeatherStatus();
-    if (page === "wind") renderWind(Date.now()); else renderWeather(Date.now());
+    renderWeather(Date.now());
   } else {
     fitAll();
   }
@@ -914,7 +849,9 @@ const shortTime = ms => formatTime(new Date(ms), false);
 // "1 PM" for whole hours, "1:30 PM" otherwise.
 const hourTime = ms => zoneParts(ms).minute ? shortTime(ms)
   : new Date(ms).toLocaleTimeString([], { hour: "numeric", timeZone: TIME_ZONE });
-const feet = v => (v < 0 ? "\u2212" : "") + Math.abs(v).toFixed(1) + " ft";
+// "6:35" from "6:35 AM", where AM or PM is obvious.
+const clockTime = ms => shortTime(ms).replace(/\s*[AP]M$/i, "");
+const feet = v => (v < 0 ? "\u2212" : "") + Math.abs(v).toFixed(1);
 
 function el(tag, className, text) {
   const e = document.createElement(tag);
@@ -938,20 +875,20 @@ function tideAt(curve, t) {
   return null;
 }
 
-// What the tide does during practice, in words.
+// What the tide does during practice, in numbers: the height at the start and the end,
+// and the high or low in between (or, if there isn't one, which way it's going and the next turn).
 function tideSummary(tides, start, end) {
-  const turn = tides.events.find(e => e.time >= start && e.time <= end);
   const h1 = tideAt(tides.curve, start), h2 = tideAt(tides.curve, end);
-  const headline = turn
-    ? (turn.type === "high" ? `High tide at ${shortTime(turn.time)}: rising, then falling`
-                            : `Low tide at ${shortTime(turn.time)}: falling, then rising`)
-    : (h2 > h1 ? "Rising all practice" : "Falling all practice");
-  const detail = h1 === null || h2 === null ? ""
-    : `${shortTime(start)} <b>${feet(h1)}</b> \u2192 ${shortTime(end)} <b>${feet(h2)}</b>`;
-  return { headline, detail };
+  if (h1 === null || h2 === null) return null;
+  const name = e => (e.type === "high" ? "High" : "Low");
+  const turn = tides.events.find(e => e.time >= start && e.time <= end);
+  const next = tides.events.find(e => e.time > end);
+  const detail = turn ? `${name(turn)} ${feet(turn.ft)} ft at ${shortTime(turn.time)}`
+    : (h2 > h1 ? "Rising" : "Falling") + (next ? ` \u00b7 ${name(next).toLowerCase()} ${shortTime(next.time)}` : "");
+  return { value: `${feet(h1)} \u2192 ${feet(h2)}`, detail };
 }
 
-// Rain in the next 24 hours, in words. `hours` are the hours the forecast covers.
+// Rain in the next 24 hours, in numbers: the total in inches and when it falls.
 function rainSummary(hourly, now) {
   const start = now - (now % 3600000);
   const hours = hourly.filter(h => h.time >= start && h.time < start + 24 * 3600000 && h.rainIn !== null);
@@ -966,104 +903,67 @@ function rainSummary(hourly, now) {
     if (!sameDay(t, now)) return p.hour < 6 ? "overnight " : "tomorrow ";
     return p.hour >= 18 && minutesOfDay(now) < 18 * 60 ? "tonight " : "";
   };
-  const range = w => {
-    const from = w[0].time, to = w[w.length - 1].time + 3600000;
-    return (from <= start ? "now" : when(from) + hourTime(from)) + " \u2013 " + hourTime(to);
-  };
-  if (!hours.length) return { hours, headline: "No rain forecast yet", detail: "" };
+  if (!hours.length) return { value: "\u2013", detail: "No forecast yet" };
   if (!windows.length) {
-    const until = hours.length < 24 ? `Dry until at least <b>${hourTime(hours[hours.length - 1].time + 3600000)}</b>` : "Dry all day and tonight";
-    return { hours, headline: "No rain expected", detail: until };
+    return { value: "0", detail: hours.length < 24 ? `Dry until ${hourTime(hours[hours.length - 1].time + 3600000)}` : "Dry all day and night" };
   }
-  const first = windows[0];
-  const peak = Math.max(...first.map(h => h.rainIn));
+  const first = windows[0], from = first[0].time, to = first[first.length - 1].time + 3600000;
+  const heavy = Math.max(...hours.map(h => h.rainIn)) >= RAIN_HEAVY_IN;
   const total = hours.reduce((sum, h) => sum + h.rainIn, 0);
-  const detail = [`About <b>${total.toFixed(2)} in</b> total`, `peak <b>${peak.toFixed(2)} in</b>/hr`];
-  if (windows.length > 1) detail.push(`again ${range(windows[1])}`);
-  const kind = peak >= RAIN_HEAVY_IN ? "Heavy rain" : total < 0.05 ? "Light rain" : "Rain";
-  return { hours, headline: `${kind} ${range(first)}`, detail: detail.join(" \u00b7 ") };
+  const detail = (heavy ? "Heavy " : "") + (from <= start ? "now" : when(from) + hourTime(from)) + " \u2013 " + hourTime(to) +
+    (windows.length > 1 ? " & later" : "");
+  return { value: total.toFixed(2), detail, heavy };
 }
 
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-function setHtml(elem, html) {
-  // Only our own strings with <b> tags go through here; all data values are numbers or times.
-  elem.innerHTML = html;
+// One tile in the strip of numbers: a big value with a small unit, and a line of detail under it.
+function setTile(id, value, unit, detail, problem) {
+  const tile = document.getElementById(id);
+  const v = tile.querySelector(".wx-value"), d = tile.querySelector(".wx-detail");
+  v.textContent = value;
+  if (unit) v.append(el("small", "", " " + unit));
+  d.textContent = detail;
+  d.classList.toggle("problem", !!problem);
+  return tile;
 }
 
-function messageFor(failed, what) {
-  return el("div", "wx-message" + (failed ? " problem" : ""), failed ? `${what} unavailable \u2014 retrying` : `Loading ${what.toLowerCase()}\u2026`);
-}
-
-function asOf(data, now) {
-  return data && now - data.fetchedAt > WEATHER_STALE_MS ? ` (as of ${shortTime(data.fetchedAt)})` : "";
+function setMissingTile(id, failed) {
+  setTile(id, "\u2013", "", failed ? "Unavailable \u2014 retrying" : "Loading\u2026", failed);
 }
 
 function renderWeather(now) {
   const day = practiceDay(now);
   const start = atMinutes(day, PRACTICE_HOURS.from), end = atMinutes(day, PRACTICE_HOURS.until);
+  const tomorrow = sameDay(start, now) ? "" : " tomorrow";
 
-  // Tides
-  document.getElementById("tide-label").textContent =
-    `Tides during practice \u00b7 ${sameDay(start, now) ? "today" : "tomorrow"} ${shortTime(start)}\u2013${shortTime(end)}`;
-  const tideBody = document.getElementById("tide-body");
-  const tideEvents = document.getElementById("tide-events");
-  if (state.tides && state.tides.curve.length) {
-    const { headline, detail } = tideSummary(state.tides, start, end);
-    const d = el("div", "wx-detail");
-    setHtml(d, detail + asOf(state.tides, now));
-    tideBody.replaceChildren(el("div", "wx-headline", headline), d);
-    const upcoming = state.tides.events.filter(e => e.time >= now).slice(0, 4);
-    setHtml(tideEvents, "Next: " + upcoming.map(e =>
-      `<span>${e.type === "high" ? "High" : "Low"} <b>${shortTime(e.time)}</b> ${feet(e.ft)}</span>`).join(" \u00b7 "));
-  } else {
-    tideBody.replaceChildren(messageFor(state.tidesFailed, "Tides"));
-    tideEvents.textContent = "";
-  }
-  drawTideChart(day, now);
+  // Tide during practice
+  const tide = state.tides && state.tides.curve.length ? tideSummary(state.tides, start, end) : null;
+  if (tide) setTile("tile-tide", tide.value, "ft", tide.detail); else setMissingTile("tile-tide", state.tidesFailed);
+  document.querySelector("#tile-tide .wx-label").textContent = `Tide${tomorrow} \u00b7 ${clockTime(start)}\u2013${clockTime(end)}`;
 
   // Sun
   const sun = sunTimes(day);
-  const sunBody = document.getElementById("sun-body");
-  const sunDetail = el("div", "wx-detail");
-  setHtml(sunDetail, `First light <b>${shortTime(sun.firstLight)}</b> \u00b7 Sunset <b>${shortTime(sun.sunset)}</b>`);
-  const parts = [el("div", "wx-big", shortTime(sun.sunrise)), sunDetail];
-  const c = state.weather && [...state.weather.hourly].reverse().find(h => h.time <= now);   // the forecast for this hour
-  if (c) {
-    const nowLine = el("div", "wx-detail");
-    setHtml(nowLine, `Now <b>${Math.round(c.tempF)}\u00b0F</b> \u00b7 Wind <b>${Math.round(c.windMph)} mph</b> from ${COMPASS[Math.round(c.windFromDeg / 45) % 8]}`);
-    parts.push(nowLine);
-  }
-  sunBody.replaceChildren(...parts);
+  const [rise, ampm] = shortTime(sun.sunrise).split(/\s+/);
+  setTile("tile-sun", rise, ampm, `First light ${clockTime(sun.firstLight)} \u00b7 sunset ${clockTime(sun.sunset)}`);
+  document.querySelector("#tile-sun .wx-label").textContent = "Sunrise" + tomorrow;
 
-  // Rain
-  const rainBody = document.getElementById("rain-body");
-  const bars = document.getElementById("rain-bars");
-  const labels = document.getElementById("rain-hours");
+  // Rain, and the forecast for this hour
   if (state.weather) {
-    const { hours, headline, detail } = rainSummary(state.weather.hourly, now);
-    const d = el("div", "wx-detail");
-    setHtml(d, detail + asOf(state.weather, now));
-    rainBody.replaceChildren(el("div", "wx-headline", headline), d);
-    bars.replaceChildren(...hours.map(h => {
-      const bar = el("div", "rain-bar" + (h.rainIn >= RAIN_HEAVY_IN ? " heavy" : h.rainIn >= RAIN_MIN_IN ? " wet" : ""));
-      const fill = el("i");
-      fill.style.height = Math.max(Math.min(h.rainIn / RAIN_BAR_FULL_IN, 1) * 100, 2) + "%";
-      bar.append(fill);
-      return bar;
-    }));
-    labels.replaceChildren(...hours.map((h, i) => {
-      const p = zoneParts(h.time);
-      return el("span", "", i % 6 === 0 ? (p.hour % 12 || 12) + (p.hour < 12 ? "a" : "p") : "");
-    }));
+    const rain = rainSummary(state.weather.hourly, now);
+    setTile("tile-rain", rain.value, rain.value === "\u2013" ? "" : "in", rain.detail)
+      .querySelector(".wx-value").classList.toggle("heavy", !!rain.heavy);
+    const c = [...state.weather.hourly].reverse().find(h => h.time <= now);
+    if (c) setTile("tile-now", Math.round(c.tempF) + "\u00b0F", "", `Wind ${Math.round(c.windMph)} mph ${COMPASS[Math.round(c.windFromDeg / 45) % 8]}`);
+    else setTile("tile-now", "\u2013", "", "No forecast yet");
   } else {
-    rainBody.replaceChildren(messageFor(state.weatherFailed, "Forecast"));
-    bars.replaceChildren();
-    labels.replaceChildren();
+    setMissingTile("tile-rain", state.weatherFailed);
+    setMissingTile("tile-now", state.weatherFailed);
   }
+
+  renderWind(now);
 }
 
-// Tide height from 4 to 11 AM on the practice day, with practice shaded.
 const SVG_NS = "http://www.w3.org/2000/svg";
 function svg(tag, attrs, text) {
   const e = document.createElementNS(SVG_NS, tag);
@@ -1072,73 +972,8 @@ function svg(tag, attrs, text) {
   return e;
 }
 
-function drawTideChart(day, now) {
-  const host = document.getElementById("tide-chart");
-  const W = host.clientWidth, H = host.clientHeight;
-  if (!W || !H || !state.tides) { host.replaceChildren(); return; }
-  const t0 = atMinutes(day, TIDE_CHART_HOURS.from), t1 = atMinutes(day, TIDE_CHART_HOURS.until);
-  const points = state.tides.curve.filter(p => p.time >= t0 && p.time <= t1);
-  if (points.length < 2) { host.replaceChildren(); return; }
-  const font = Math.min(innerWidth, innerHeight) * 0.024;
-  // Room above for labels on highs, below for labels on lows and the hour labels.
-  const pad = { l: font * 3.2, r: font * 0.5, t: font * 2.4, b: font * 3.6 };
-  const lo = Math.min(...points.map(p => p.ft)) - 0.4, hi = Math.max(...points.map(p => p.ft)) + 0.4;
-  const x = t => pad.l + (t - t0) / (t1 - t0) * (W - pad.l - pad.r);
-  const y = v => pad.t + (hi - v) / (hi - lo) * (H - pad.t - pad.b);
-  const muted = "#8da2c0", accent = "#4da3ff";
-  const out = svg("svg", { viewBox: `0 0 ${W} ${H}`, "font-size": font, "font-family": "inherit" });
-
-  // Practice window
-  const ps = atMinutes(day, PRACTICE_HOURS.from), pe = atMinutes(day, PRACTICE_HOURS.until);
-  out.append(svg("rect", { x: x(ps), y: pad.t, width: x(pe) - x(ps), height: H - pad.t - pad.b, fill: "rgba(77,163,255,0.14)", rx: font * 0.3 }));
-  // Label at the bottom of the band, or the top if a low tide's label is down there.
-  const lowInPractice = state.tides.events.some(e => e.type === "low" && e.time >= ps && e.time <= pe);
-  out.append(svg("text", { x: (x(ps) + x(pe)) / 2, y: lowInPractice ? pad.t + font * 1.2 : H - pad.b - font * 0.5,
-    fill: accent, "text-anchor": "middle", "font-weight": 700 }, "Practice"));
-
-  // Height gridlines (whole feet)
-  const step = hi - lo > 6 ? 2 : 1;
-  for (let v = Math.ceil(lo); v <= Math.floor(hi); v += step) {
-    out.append(svg("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), stroke: "rgba(255,255,255,0.08)" }));
-    out.append(svg("text", { x: pad.l - font * 0.4, y: y(v) + font * 0.35, fill: muted, "text-anchor": "end" }, (v < 0 ? "\u2212" : "") + Math.abs(v) + " ft"));
-  }
-
-  // Hour labels
-  // Hour labels, leaving out the two ends so nothing crowds the edges.
-  for (let m = TIDE_CHART_HOURS.from + 60; m < TIDE_CHART_HOURS.until; m += 60) {
-    const h = m / 60;
-    out.append(svg("text", { x: x(atMinutes(day, m)), y: H - font * 0.4, fill: muted, "text-anchor": "middle" }, (h % 12 || 12) + (h < 12 ? " AM" : " PM")));
-  }
-
-  // Curve and area under it
-  const line = points.map((p, i) => (i ? "L" : "M") + x(p.time).toFixed(1) + " " + y(p.ft).toFixed(1)).join(" ");
-  const base = H - pad.b;
-  out.append(svg("path", { d: `${line} L${x(points[points.length - 1].time).toFixed(1)} ${base} L${x(points[0].time).toFixed(1)} ${base} Z`, fill: "rgba(77,163,255,0.10)" }));
-  out.append(svg("path", { d: line, fill: "none", stroke: accent, "stroke-width": font * 0.25, "stroke-linejoin": "round" }));
-
-  // Highs and lows in range
-  for (const e of state.tides.events.filter(e => e.time >= t0 && e.time <= t1)) {
-    const ex = x(e.time), ey = y(e.ft), above = e.type === "high";
-    out.append(svg("circle", { cx: ex, cy: ey, r: font * 0.35, fill: "#f2f6ff" }));
-    const anchor = ex < W * 0.2 ? "start" : ex > W * 0.8 ? "end" : "middle";
-    out.append(svg("text", { x: ex, y: above ? ey - font * 0.8 : ey + font * 1.6, fill: "#f2f6ff", "text-anchor": anchor, "font-weight": 700 },
-      `${above ? "High" : "Low"} ${shortTime(e.time)} \u00b7 ${feet(e.ft)}`));
-  }
-
-  // Now
-  if (now >= t0 && now <= t1) {
-    out.append(svg("line", { x1: x(now), x2: x(now), y1: pad.t, y2: base, stroke: "#ffd34d", "stroke-width": font * 0.12, "stroke-dasharray": `${font * 0.4} ${font * 0.3}` }));
-    out.append(svg("text", { x: x(now) + font * 0.3, y: base - font * 0.4, fill: "#ffd34d", "font-weight": 700 }, "now"));
-  }
-  host.replaceChildren(out);
-}
-
-// Redraw the chart when its box changes size.
-new ResizeObserver(() => { if (state.shownScreen === "weather") drawTideChart(practiceDay(Date.now()), Date.now()); })
-  .observe(document.getElementById("tide-chart"));
-
 // =============================================================================
-// Wind screen: the rowing course at 7, 8 and 9 AM with the wind drawn as streaks.
+// Wind: the rowing course at 7, 8 and 9 AM with the wind drawn as streaks.
 // The map (data/estuary-map.json) is turned so the course runs left to right,
 // Jack London to the Pitt. Bright streaks are on the water, faint ones over land.
 // =============================================================================
@@ -1262,13 +1097,15 @@ function drawWindMap(host, map, w, withLabels) {
   host.replaceChildren(root);
 }
 
-let windDrawn = "";   // what the wind page currently shows, so it's only redrawn when something changed
+let windDrawn = "";   // what the wind rows currently show, so it's only redrawn when something changed
 function renderWind(now) {
   const host = document.getElementById("wind");
   const wx = state.weather, map = state.map;
   if (!wx || !map || wx.points !== map.points.length) {
     const failed = state.weatherFailed || !!(wx && map);
-    if (windDrawn !== "message " + failed) host.replaceChildren(messageFor(failed, "Wind forecast"));
+    if (windDrawn !== "message " + failed) {
+      host.replaceChildren(el("div", "wx-message" + (failed ? " problem" : ""), failed ? "Wind forecast unavailable \u2014 retrying" : "Loading wind forecast\u2026"));
+    }
     windDrawn = "message " + failed;
     return;
   }
@@ -1297,6 +1134,10 @@ function renderWind(now) {
   host.replaceChildren(...rows.map(r => r.row));
   rows.forEach((r, i) => { if (r.w) drawWindMap(r.mapBox, map, r.w, i === 0); });
 }
+
+// Redraw the maps when their box changes size.
+new ResizeObserver(() => { if (state.shownScreen === "weather") renderWind(Date.now()); })
+  .observe(document.getElementById("wind"));
 
 // =============================================================================
 // Fitting: CSS sizes the numbers; this only corrects what CSS can't know
@@ -1526,13 +1367,11 @@ function every(ms, job) {
 
 function tickClock() {
   document.getElementById("clock").textContent = formatTime(new Date(), false);
-  // The schedule, a manual switch or the weather pages' turn changed what's showing.
-  if (activeScreen() !== state.shownScreen || (state.shownScreen === "weather" && weatherPage() !== state.shownPage)) render();
+  // The schedule or a manual switch changed what's showing.
+  if (activeScreen() !== state.shownScreen) render();
 }
 
 document.getElementById("screen-toggle").addEventListener("click", toggleScreen);
-document.getElementById("weather").addEventListener("click", togglePage);
-document.getElementById("wind").addEventListener("click", togglePage);
 addEventListener("resize", () => { if (state.shownScreen === "weather") render(); });
 
 setSplit(savedSplit(), false);
