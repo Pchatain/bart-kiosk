@@ -39,20 +39,25 @@
   }
   header h1 span { color: var(--accent); }
   .title { display: flex; align-items: center; gap: 1.6vmin; }
-  /* Tap to switch between trains and weather (for 5 minutes). */
+  /* A two-part switch, trains | weather, with the screen that's showing lit up.
+     Tap it to switch to the other one (for 5 minutes). */
   #screen-toggle {
-    width: 7vmin; height: 7vmin;
-    padding: 1.1vmin;
+    display: flex;
+    gap: 0.4vmin;
+    height: 7vmin;
+    padding: 0.5vmin;
     border: 2px solid rgba(255,255,255,0.18);
-    border-radius: 1.4vmin;
+    border-radius: 1.6vmin;
     background: var(--panel);
-    color: var(--accent);
+    color: var(--muted);
     cursor: pointer;
     flex-shrink: 0;
   }
-  #screen-toggle svg { width: 100%; height: 100%; display: block; }
-  #screen-toggle .to-trains, body.show-weather #screen-toggle .to-weather { display: none; }
-  body.show-weather #screen-toggle .to-trains { display: block; }
+  #screen-toggle svg { height: 100%; aspect-ratio: 1.25; padding: 0.8vmin; border-radius: 1vmin; display: block; }
+  #screen-toggle .cloud { fill: var(--panel); }
+  body:not(.show-weather) #screen-toggle .icon-trains,
+  body.show-weather #screen-toggle .icon-weather { background: var(--accent); color: var(--bg); }
+  body.show-weather #screen-toggle .cloud { fill: var(--accent); }
   main[hidden], #weather[hidden] { display: none; }
   body.show-weather #ticker { display: none; }
   #clock {
@@ -263,28 +268,31 @@
   #status.problem { color: #ff8a80; }
   #version { margin-left: 1em; opacity: 0.6; }
 
-  /* ---- Weather screen: a strip of numbers (tide, rain, sunrise, now), then the wind maps ---- */
+  /* ---- Weather screen: the wind maps, with a column of numbers (tide, rain, sunrise, now) on the right ---- */
   #weather {
     flex: 1;
     min-height: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row-reverse;   /* the numbers come first in the page, and sit on the right */
     gap: 1.5vmin;
     padding: 0 2vw 1vmin;
   }
-  #wx-strip { display: flex; gap: 1.2vmin; }
-  /* Each tile is as wide as its text needs, plus an equal share of the spare room. */
+  #wx-strip { flex: 0 0 auto; display: flex; flex-direction: column; gap: 1.5vmin; }
   .wx-tile {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     background: var(--panel);
     border-radius: 1.5vmin;
-    padding: 0.8vmin 1.2vmin 1vmin;
+    padding: 0.8vmin 1.6vmin 1vmin;
     white-space: nowrap;
   }
   .wx-tile > div { overflow: hidden; text-overflow: ellipsis; }
   .wx-label { font-size: 2.1vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .wx-value { font-size: 5.4vmin; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .wx-value { font-size: 6vmin; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
   .wx-value small { font-size: 2.6vmin; font-weight: 400; color: var(--muted); }
   .wx-value.heavy { color: var(--accent); }
   .wx-detail { font-size: 2.25vmin; color: var(--muted); }
@@ -333,7 +341,9 @@
     #divider { margin: 1.2vmin 0; cursor: row-resize; }
     #divider::before { left: 0; right: 0; top: -2.5vmin; bottom: -2.5vmin; }
     #divider::after { width: 9vmin; height: 0.5vmin; }
-    #wx-strip { display: grid; grid-template-columns: 1fr 1fr; }
+    #weather { flex-direction: column; }
+    #wx-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2vmin; }
+    .wx-value { font-size: 5.4vmin; }
     .wind-row { flex-direction: column; }
     .wind-info { flex: none; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 1.2em; }
   }
@@ -343,12 +353,12 @@
   <header>
     <div class="title">
       <button id="screen-toggle" type="button" aria-label="Show weather">
-        <svg class="to-weather" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <circle cx="9" cy="9" r="3.5"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"/>
-          <path d="M11 20.5h8a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 11 20.5z" fill="var(--panel)"/>
-        </svg>
-        <svg class="to-trains" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg class="icon-trains" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="5" y="2.5" width="14" height="15" rx="3"/><path d="M5 10h14M9 21.5l-2-4M15 21.5l2-4"/><circle cx="9" cy="14" r="0.8" fill="currentColor"/><circle cx="15" cy="14" r="0.8" fill="currentColor"/>
+        </svg>
+        <svg class="icon-weather" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="9" cy="9" r="3.5"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"/>
+          <path class="cloud" d="M11 20.5h8a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.2A3 3 0 0 0 11 20.5z"/>
         </svg>
       </button>
       <h1>Fruitvale <span id="title-word">BART</span></h1>
@@ -384,7 +394,7 @@
     <div id="footer-note">Departures within the next 60 minutes</div>
     <div class="tag">GCCRCNPO!</div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v12</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v12.1</span></div>
   </footer>
 
 <script>
