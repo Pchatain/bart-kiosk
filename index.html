@@ -259,6 +259,10 @@
     color: var(--muted);
   }
   footer .tag { letter-spacing: 0.15em; }
+  footer .center { display: flex; align-items: center; gap: 1.5em; white-space: nowrap; }
+  #olympics { display: inline-flex; align-items: center; gap: 0.5em; }
+  #olympics[hidden] { display: none; }
+  #olympics svg { height: 1.2em; width: auto; display: block; }
   footer .right { text-align: right; }
   #status.problem { color: #ff8a80; }
   #version { margin-left: 1em; opacity: 0.6; }
@@ -425,9 +429,18 @@
   <div id="ticker" hidden aria-live="polite"><span id="ticker-text"></span></div>
   <footer>
     <div id="footer-note">Departures within the next 60 minutes</div>
-    <div class="tag">GCCRCNPO!</div>
+    <div class="center">
+      <span class="tag">GCCRCNPO!</span>
+      <span id="olympics" hidden>
+        <svg viewBox="0 0 68 32" fill="none" stroke-width="2.4" role="img" aria-label="Olympic rings">
+          <circle cx="11" cy="11" r="9" stroke="#3f9bdc"/><circle cx="34" cy="11" r="9" stroke="#e8eaed"/><circle cx="57" cy="11" r="9" stroke="#ee4b5a"/>
+          <circle cx="22.5" cy="21" r="9" stroke="#f4c300"/><circle cx="45.5" cy="21" r="9" stroke="#2fb457"/>
+        </svg>
+        <span id="olympics-days"></span>
+      </span>
+    </div>
     <!-- Increase the version number in every pull request; a GitHub check fails if it isn't. -->
-    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v11.1</span></div>
+    <div class="right"><span id="status">Updating&hellip;</span><span id="version">v11.2</span></div>
   </footer>
 
 <script>
@@ -441,6 +454,7 @@ const BART_KEY = "MW9S-E7SL-26DU-VV8V";
 const DEPARTURES_URL = `https://api.bart.gov/api/etd.aspx?cmd=etd&orig=FTVL&key=${BART_KEY}&json=y`;
 const ADVISORIES_URL = `https://api.bart.gov/api/bsa.aspx?cmd=bsa&key=${BART_KEY}&json=y`;
 
+const OLYMPICS_START = { year: 2028, month: 7, day: 14 };   // Los Angeles 2028 opening ceremony
 const TIME_ZONE = "America/Los_Angeles";   // show Bay Area time even if the tablet's zone is wrong
 const MAX_MINUTES = 60;                    // ignore trains further out than this
 const DEPARTURES_EVERY_MS = 30 * 1000;
@@ -1524,8 +1538,20 @@ function every(ms, job) {
   return setInterval(run, ms);
 }
 
+// Whole calendar days (Bay Area dates) until the Olympics open; hidden once they've begun.
+function renderOlympics() {
+  const today = zoneParts(Date.now());
+  const days = Math.round((Date.UTC(OLYMPICS_START.year, OLYMPICS_START.month - 1, OLYMPICS_START.day)
+    - Date.UTC(today.year, today.month - 1, today.day)) / 86400000);
+  const text = days > 1 ? `${days} days` : days === 1 ? "1 day" : "Today";
+  const label = document.getElementById("olympics-days");
+  if (label.textContent !== text) label.textContent = text;
+  document.getElementById("olympics").hidden = days < 0;
+}
+
 function tickClock() {
   document.getElementById("clock").textContent = formatTime(new Date(), false);
+  renderOlympics();
   // The schedule, a manual switch or the weather pages' turn changed what's showing.
   if (activeScreen() !== state.shownScreen || (state.shownScreen === "weather" && weatherPage() !== state.shownPage)) render();
 }
